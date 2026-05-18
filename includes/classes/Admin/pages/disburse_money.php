@@ -15,6 +15,7 @@ use function bKash\PGW\DC\WooCommerceBkashDC;
 	</h1>
 <br>
 <form action="#" method="post">
+	<?php wp_nonce_field( 'bkash_disburse_money', 'bkash_disburse_nonce' ); ?>
 
 	<table id="disburse-money-table" aria-describedby="disburse money">
 		<tr>

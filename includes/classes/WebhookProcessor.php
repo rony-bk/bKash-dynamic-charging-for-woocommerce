@@ -15,28 +15,29 @@ namespace bKash\PGW\DC;
 use bKash\PGW\DC\Models\Webhook;
 use DateTime;
 use Exception;
-use WC_Logger;
 
 class WebhookProcessor {
 	private $payload;
 	private $context = array( "source" => BKASH_DC_PLUGIN_SLUG );
-	private $log;
 	private $canSubscribe;
 
 	private $messageType = "";
 	private $signingCertURL;
 
-	public function __construct( WC_Logger $logger = null, bool $canSubscribe = false ) {
+	public function __construct( bool $canSubscribe = false, string $rawInput = '' ) {
 		$this->canSubscribe = $canSubscribe;
 
-		// GET THE RAW STREAM OF POST PAYLOAD
-		$this->payload = json_decode( file_get_contents( 'php://input' ), false );
-		if ( $this->payload ) {
-			$this->messageType    = Sanitizer::safeServerValue( "HTTP_X_AMZ_SNS_MESSAGE_TYPE" );
-			$this->signingCertURL = $this->payload->SigningCertURL ?? null;
+		if ( '' === trim( $rawInput ) ) {
+			$rawInput = file_get_contents( 'php://input' );
 		}
-		if ( $logger ) {
-			$this->log = $logger;
+
+		if ( is_string( $rawInput ) && '' !== trim( $rawInput ) ) {
+			$this->payload = json_decode( $rawInput, false );
+		}
+
+		if ( $this->payload ) {
+			$this->messageType = Sanitizer::safeServerValue( 'HTTP_X_AMZ_SNS_MESSAGE_TYPE' );
+			$this->signingCertURL = isset( $this->payload->SigningCertURL ) ? esc_url_raw( sanitize_text_field( $this->payload->SigningCertURL ) ) : '';
 		}
 	}
 
@@ -46,10 +47,16 @@ class WebhookProcessor {
 	final public function processRequest() {
 		if ( $this->messageType === 'SubscriptionConfirmation' ) {
 			$this->subscribe();
+
+			return true;
 		} elseif ( $this->messageType === 'Notification' ) {
 			$this->storeNotification();
+
+			return true;
 		} else {
 			$this->writeLog( "No method present to process the webhook" );
+
+			return false;
 		}
 	}
 
@@ -61,8 +68,9 @@ class WebhookProcessor {
 		if ( $this->canSubscribe ) {
 			if ( $this->payload && $this->verifySource() ) {
 				if ( isset( $this->payload->SubscribeURL ) ) {
-					$this->writeLog( "Subscribing to ==> " . $this->payload->SubscribeURL );
-					$subscriptionResponse = wp_remote_get( $this->payload->SubscribeURL );
+					$subscribeUrl = esc_url_raw( sanitize_text_field( $this->payload->SubscribeURL ) );
+					$this->writeLog( "Subscribing to ==> " . $subscribeUrl );
+					$subscriptionResponse = wp_remote_get( $subscribeUrl );
 					if ( is_wp_error( $subscriptionResponse ) ) {
 						$this->writeLog( "Error subscribing the URL: " . wp_json_encode( $subscriptionResponse ) );
 					} else {
@@ -112,6 +120,7 @@ class WebhookProcessor {
 	 * @return bool
 	 */
 	final public function validateURL( string $url ): bool {
+		$url = esc_url_raw( sanitize_text_field( $url ) );
 		$defaultHostPattern = '/^sns\.[a-zA-Z\d\-]{3,}\.amazonaws\.com(\.cn)?$/';
 		$parsed             = wp_parse_url( $url );
 
@@ -128,7 +137,8 @@ class WebhookProcessor {
 	 * @return string
 	 */
 	final public function getContent( string $url ): string {
-		$body     = '';
+		$body = '';
+		$url = esc_url_raw( sanitize_text_field( $url ) );
 		$response = wp_remote_get( $url );
 		if ( is_wp_error( $response ) ) {
 			$this->writeLog( "Error in getting content.. " . wp_json_encode( $response ) );
@@ -145,9 +155,7 @@ class WebhookProcessor {
 	 * @return void
 	 */
 	final public function writeLog( $logging_item ) {
-		if ( $this->log ) {
-			$this->log->debug( $logging_item, $this->context );
-		}
+		Log::debug( $logging_item );
 	}
 
 	/**
@@ -208,21 +216,20 @@ class WebhookProcessor {
 					$parseDate = date( 'Y-m-d H:i:s' );
 				}
 
-
 				$webhooks = new Webhook();
-				$webhooks->setSender( $message->debitMSISDN ?? '' );
-				$webhooks->setReceiver( $message->creditShortCode ?? '' );
+				$webhooks->setSender( sanitize_text_field( $message->debitMSISDN ?? '' ) );
+				$webhooks->setReceiver( sanitize_text_field( $message->creditShortCode ?? '' ) );
 				$webhooks->setAmount( isset( $message->amount ) ? (float) $message->amount : '' );
-				$webhooks->setTrxId( $message->trxID ?? '' );
-				$webhooks->setCurrency( $message->currency ?? '' );
+				$webhooks->setTrxId( sanitize_text_field( $message->trxID ?? '' ) );
+				$webhooks->setCurrency( sanitize_text_field( $message->currency ?? '' ) );
 				$webhooks->setDatetime(
 					$parseDate->format( "Y-m-d H:i:s" )
 				);
-				$webhooks->setType( $message->transactionType ?? '' );
+				$webhooks->setType( sanitize_text_field( $message->transactionType ?? '' ) );
 				if ( isset( $message->creditOrganizationName ) ) {
-					$webhooks->setReceiverName( $message->creditOrganizationName );
+					$webhooks->setReceiverName( sanitize_text_field( $message->creditOrganizationName ) );
 				}
-				$webhooks->setStatus( $message->transactionStatus ?? '' );
+				$webhooks->setStatus( sanitize_text_field( $message->transactionStatus ?? '' ) );
 				$isSaved = $webhooks->save();
 				$this->writeLog( "Saving webhook payment, " . wp_json_encode( $isSaved ) );
 				if ( $isSaved ) {

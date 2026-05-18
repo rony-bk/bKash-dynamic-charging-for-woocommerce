@@ -44,7 +44,11 @@ class TransactionModule {
 	 */
 	public static function transactionSearch() {
 		try {
-			$trx_id = Sanitizer::safePostValue( 'trxid' );
+			$trx_id = '';
+			if ( Sanitizer::safeServerValue( 'REQUEST_METHOD' ) === 'POST' ) {
+				check_admin_referer( 'bkash_transaction_search', 'bkash_transaction_search_nonce' );
+				$trx_id = Sanitizer::safePostValue( 'trxid' );
+			}
 
 			if ( ! empty( $trx_id ) ) {
 				$api  = new BkashApi();
@@ -84,8 +88,13 @@ class TransactionModule {
 		$isRefund      = ! empty( Sanitizer::hasPostField( 'refund' ) );
 		$isRefundCheck = ! empty( Sanitizer::hasPostField( 'check' ) );
 
-			echo $isRefundCheck; 
-
+		if ( Sanitizer::safeServerValue( 'REQUEST_METHOD' ) === 'POST' ) {
+			if ( $isRefund ) {
+				check_admin_referer( 'bkash_refund_transaction', 'bkash_refund_nonce' );
+			} elseif ( $isRefundCheck ) {
+				check_admin_referer( 'bkash_refund_status', 'bkash_refund_status_nonce' );
+			}
+		}
 
 		if ( ! empty( $trx_id ) ) {
 			$trxObject   = new Transaction();

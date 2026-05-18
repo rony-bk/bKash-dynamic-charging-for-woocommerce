@@ -1,56 +1,65 @@
-<?php 
+<?php
 
 namespace bKash\PGW\DC;
 
 use WC_Logger;
 
 class Log {
-	public static function debug( $str ) {
-		self::writeLog( 'DEBUG: ' );
-		self::writeLog( $str );
-	}
+	/**
+	 * @var WC_Logger|null
+	 */
+	private static $logger;
 
-	public static function writeLog( $str ) {
-		if ( self::isDebug() === 'yes' ) {
-			global $woocommerce;
-
-			$logger = null;
-			if ( class_exists( WC_Logger::class ) ) {
-				$logger = new WC_Logger();
-			} elseif ( ! empty( $woocommerce ) ) {
-				$logger = $woocommerce->logger();
-			}
-
-			if ( $logger ) {
-				$logger->add( 'bKash_DC_API_LOG', print_r( $str, true ) );
-			} elseif ( true === WP_DEBUG ) {
-				if ( is_array( $str ) || is_object( $str ) ) {
-					error_log( print_r( $str, true ) );
-				} else {
-					error_log( $str );
-				}
-			}
-		}
-	}
-
-	public static function isDebug() {
-		$is_debug  = 'no';
-		$plugin_id = BKASH_DC_PLUGIN_SLUG;
-		$settings  = get_option( 'woocommerce_' . $plugin_id . '_settings' );
-		if ( ! is_null( $settings ) ) {
-			$is_debug = $settings['debug'] ?? 'no';
+	public static function debug( $message ) {
+		if ( self::isDebug() !== 'yes' ) {
+			return;
 		}
 
-		return $is_debug;
+		self::writeLog( 'debug', $message );
 	}
 
-	public static function info( $str ) {
-		self::writeLog( 'INFO: ' );
-		self::writeLog( $str );
+	public static function info( $message ) {
+		if ( self::isDebug() !== 'yes' ) {
+			return;
+		}
+
+		self::writeLog( 'info', $message );
 	}
 
-	public static function error( $str ) {
-		self::writeLog( 'ERROR: ' );
-		self::writeLog( $str );
+	public static function error( $message ) {
+		self::writeLog( 'error', $message );
+	}
+
+	private static function writeLog( string $level, $message ): void {
+		$logger = self::getLogger();
+		if ( ! $logger ) {
+			return;
+		}
+
+		$message = is_string( $message ) ? $message : wp_json_encode( $message );
+		$logger->log( $level, $message, array( 'source' => 'bKash_DC_API_LOG' ) );
+	}
+
+	private static function getLogger(): ?WC_Logger {
+		if ( self::$logger !== null ) {
+			return self::$logger;
+		}
+
+		if ( class_exists( WC_Logger::class ) ) {
+			self::$logger = function_exists( 'wc_get_logger' ) ? wc_get_logger() : new WC_Logger();
+		} else {
+			self::$logger = null;
+		}
+
+		return self::$logger;
+	}
+
+	public static function isDebug(): string {
+		$settings  = get_option( 'woocommerce_' . BKASH_DC_PLUGIN_SLUG . '_settings' );
+		if ( ! is_array( $settings ) ) {
+			return 'no';
+		}
+
+		return $settings['debug'] ?? 'no';
 	}
 }

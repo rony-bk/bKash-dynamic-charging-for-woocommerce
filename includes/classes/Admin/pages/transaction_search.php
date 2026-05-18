@@ -15,6 +15,7 @@ use function bKash\PGW\DC\WooCommerceBkashDC;
 	</h1>
 <br>
 <form action="#" method="post">
+	<?php wp_nonce_field( 'bkash_transaction_search', 'bkash_transaction_search_nonce' ); ?>
 	<label for="trxid" class="form-label">Transaction ID</label>
 	<input name="trxid" type="text" id="trxid" placeholder="Transaction ID" class="form-text-input" autocomplete="off" value="<?php esc_attr_e( $trx_id ?? '', 'woo-bkash-dynamic-charging' ); ?>">
 

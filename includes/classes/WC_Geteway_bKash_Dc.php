@@ -17,7 +17,6 @@ namespace bKash\PGW\DC;
 use bKash\PGW\DC\Models\Transaction;
 use Exception;
 use WC_AJAX;
-use WC_Logger;
 use WC_Order;
 use WC_Payment_Gateway;
 use WP_Error;
@@ -37,7 +36,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
 
 	class WC_Geteway_bKash_Dc extends WC_Payment_Gateway {
 
-    public $log;
     public $refundObj;
     public $refundError;
     private $CALLBACK_URL         = 'bkashdc_payment_process';
@@ -138,15 +136,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
         $this->password         = $this->get_option( 'password' );
         $this->debug            = $this->get_option( 'debug' );
         $this->enable_b2c       = $this->get_option( 'enable_b2c' );
-      
-        if ( $this->debug === 'yes' ) {
-            if ( class_exists( WC_Logger::class ) ) {
-                $this->log = new WC_Logger();
-            } else {
-                global $woocommerce;
-                $this->log = isset( $woocommerce ) ? $woocommerce->logger() : null;
-            }
-        }
         $this->is_webhook = $this->get_option( 'webhook' );
     }
 
@@ -193,8 +182,9 @@ if (!class_exists('WC_Payment_Gateway')) return;
         // reset token when setting changes
         add_action( 'update_option', array( $this, 'onUpdateResetToken' ), 10, 3 );
         add_action( 'before_woocommerce_init', function() {
-        if ( class_exists( \Automattic\WooCommerce\Utilities\FeaturesUtil::class ) ) {
-            \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );}
+            if ( class_exists( '\\Automattic\\WooCommerce\\Utilities\\FeaturesUtil' ) ) {
+                \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', BKASH_DC_PLUGIN_BASEPATH, true );
+            }
         } );
         add_action( 'woocommerce_thankyou_' . $this->id, array( $this, 'thankYouPage' ) );
     }
@@ -328,7 +318,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
         }
 
         if ( ! empty( $description ) ) {
-            echo wpautop( wptexturize( trim( $description ) ) );
+            echo wp_kses_post( wpautop( wptexturize( trim( $description ) ) ) );
         }        
     }
 
@@ -368,9 +358,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
 
         $process = new Payments( $this->integration_type );
         $resp    = $process->cancelPayment( $order_id );
-        echo wp_json_encode( $resp );
-
-        die();
+        wp_send_json( $resp );
     }
 
     final public function onUpdateResetToken( string $option_name, $old_value, $value ) {
@@ -422,25 +410,22 @@ if (!class_exists('WC_Payment_Gateway')) return;
             $order_id = Sanitizer::safeGetValue( 'order_id' );
         }
 
-        header( 'Content-Type: application/json' );
-
         if ( $order_id ) {
-            echo wp_json_encode( $this->process_payment( $order_id ) );
-        } else {
-            echo wp_json_encode(
-                array(
-                    'result'  => 'failure',
-                    'message' => 'Order ID is missing',
-                )
-            );
+            wp_send_json( $this->process_payment( $order_id ) );
         }
-        die();
+
+        wp_send_json(
+            array(
+                'result'  => 'failure',
+                'message' => 'Order ID is missing',
+            )
+        );
     }
 
     public function process_payment( $order_id ) {
-        $cbURL = get_site_url() . BKASH_DC_WC_API . $this->CALLBACK_URL . '?orderId=' . $order_id;
+        $cbURL = add_query_arg( 'orderId', $order_id, get_site_url() . BKASH_DC_WC_API . $this->CALLBACK_URL );
 
-	    return ( new Payments( $this->integration_type ) )->createPayment( $order_id, $this->intent, $cbURL );     
+        return ( new Payments( $this->integration_type ) )->createPayment( $order_id, $this->intent, $cbURL );
     }
 
     final public function paymentSuccess() {
@@ -477,12 +462,8 @@ if (!class_exists('WC_Payment_Gateway')) return;
         } elseif ( ! class_exists( 'WordPressHTTPS' ) && 'no' === get_option( 'woocommerce_force_ssl_checkout' ) && ! is_ssl()
         ) {
             // Show message if enabled and FORCE SSL is disabled and WordPress HTTPS plugin is not detected.
-            $admin_checkout_setting_url = esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout' ) ); ?>
-            <div class="error ssl-error"><p>bKash PGW is enabled, but the <a href="
-            <?php
-                    esc_html_e( $admin_checkout_setting_url, 'woo-bkash-dynamic-charging' );
-            ?>
-                    ">Force SSL option</a> is
+            $admin_checkout_setting_url = admin_url( 'admin.php?page=wc-settings&tab=checkout' ); ?>
+            <div class="error ssl-error"><p>bKash PGW is enabled, but the <a href="<?php echo esc_url( $admin_checkout_setting_url ); ?>">Force SSL option</a> is
                     disabled;
                     your payment may not be secure! Please enable SSL and ensure your server has a valid SSL
                     certificate -
@@ -516,10 +497,10 @@ if (!class_exists('WC_Payment_Gateway')) return;
         // To receive order id
         $order = wc_get_order( $order_id );
         if ( $order ) {
-            $cbURL = get_site_url() . BKASH_DC_WC_API . $this->CALLBACK_URL . '?orderId=' . $order_id;
+            $cbURL = add_query_arg( 'orderId', $order_id, get_site_url() . BKASH_DC_WC_API . $this->CALLBACK_URL );
 
             $process = new Payments( $this->integration_type );
-            // Log::debug( wp_json_encode($cbURL) );
+            // Debug output is handled by WooCommerce logger when enabled.
             $process->executePayment( $this->get_return_url( $order ), $cbURL );
         } else {
             echo wp_json_encode(
@@ -529,9 +510,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
                 )
             );
         }
-        die();
     }
-
 
     public static function voidTransactionOnCanceled( $order_id, $order ) {
         $trx            = '';
@@ -608,16 +587,47 @@ if (!class_exists('WC_Payment_Gateway')) return;
     }
 
     final public function webhook() {
+        $method = strtoupper( $_SERVER['REQUEST_METHOD'] ?? 'GET' );
+        if ( 'POST' !== $method ) {
+            status_header( 405 );
+            header( 'Allow: POST' );
+            wp_send_json_error(
+                array( 'message' => 'Method Not Allowed' ),
+                405
+            );
+            return;
+        }
+
+        $raw_payload = file_get_contents( 'php://input' );
+        if ( ! is_string( $raw_payload ) || '' === trim( $raw_payload ) ) {
+            status_header( 400 );
+            wp_send_json_error(
+                array( 'message' => 'Webhook payload is empty' ),
+                400
+            );
+            return;
+        }
+
+        json_decode( $raw_payload, true );
+        if ( json_last_error() !== JSON_ERROR_NONE ) {
+            status_header( 400 );
+            wp_send_json_error(
+                array( 'message' => 'Invalid JSON payload' ),
+                400
+            );
+            return;
+        }
+
         if ( isset( $this->is_webhook ) && $this->is_webhook === 'yes' ) {
-            $webhook = new WebhookProcessor( wc_get_logger(), true );
+            $webhook = new WebhookProcessor( true, $raw_payload );
             $webhook->processRequest();
         } else {
-            $this->log->add( $this->id, 'WebhookModule is not enabled in settings' );
+            Log::info( 'WebhookModule is not enabled in settings' );
         }
-        $payload = (array) json_decode( file_get_contents( 'php://input' ), true );
-        $this->log->add( $this->id, 'WEBHOOK => BODY: ' . print_r( $payload, true ) );
 
-        die();
+        Log::debug( 'Webhook payload received and processed' );
+
+        wp_send_json_success();
     }
 
     /**
@@ -644,12 +654,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
     private function extraDetails( $order_id = '' ) {
         $order = wc_get_order( $order_id );
         $id    = $order->get_transaction_id();
-        
-        // echo "<pre>";
-        // echo $id;
-        // // print_r($order);
-        
-        // exit;
 
         echo wp_kses_post( '<h2> Payment Details </h2>' ) . PHP_EOL;
 
@@ -691,8 +695,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
                     $transaction->getOrderID(),
                     $reason ?? 'Refund Purpose'
                 );
-                // echo "<pre>"; 
-                // print_r($call);exit;
                 if ( isset( $call['status_code'] ) && $call['status_code'] === 200 ) {
 
                     $trx = array();
@@ -735,10 +737,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
                             );
 
                             if ( $this->debug === 'yes' ) {
-                                $this->log->add(
-                                    $this->id,
-                                    'bKash PGW order #' . $order_id . ' refunded successfully!'
-                                );
+                                Log::debug( 'bKash PGW order #' . $order_id . ' refunded successfully!' );
                             }
 
                             return true;
@@ -763,11 +762,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
             $order->add_order_note( 'Error in refunding the order. ' . esc_html( $trx ) );
 
             if ( $this->debug === 'yes' ) {
-                $this->log->add(
-                    $this->id,
-                    'Error in refunding the order #' . $order_id . '. bKash PGW response: '
-                    . print_r( esc_html( $response ), true )
-                );
+                Log::debug( 'Error in refunding the order #' . $order_id . '. Refund request failed.' );
             }
         }
 
@@ -811,7 +806,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
     }
 
     public static function captureTransactionFromStatus( int $order_id, WC_Order $order ) {
-        $orderDetails   = wc_get_order( $order_id );
+        $orderDetails   = $order;
         $id             = $orderDetails->get_transaction_id();
         $payment_method = $orderDetails->get_payment_method();
 

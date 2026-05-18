@@ -16,6 +16,7 @@ use function bKash\PGW\DC\WooCommerceBkashDC;
 	</h1>
 <br>
 <form action="#" method="post">
+	<?php wp_nonce_field( 'bkash_transfer_balance', 'bkash_transfer_nonce' ); ?>
 
 	<table id="transfer-balance-table" aria-describedby="transfer balance">
 		<tr>

@@ -95,9 +95,7 @@ class Payments {
 					} elseif ( isset( $response['paymentId'] ) && ! empty( $response['paymentId'] ) ) {
 						// Remove items from cart.
 						WC()->cart->empty_cart();
-						if ( isset( $this->log ) && $this->log ) {
-							$this->log->add( $this->id, 'Cart emptied.' );
-						}
+						Log::debug( 'Cart emptied.' );
 
 						$updated = $trxSaved->update( array( 'payment_id' => $response['paymentId'] ) );
 						if ( $updated ) {
@@ -153,7 +151,7 @@ class Payments {
 		$order       = wc_get_order( $order_id );
 		$trx         = new Transaction();
 		$transaction = $trx->getTransaction( $invoice_id );
-		// print_r($order);die();
+
 
 		if ( $status === 'success' ) {
 
@@ -187,7 +185,8 @@ class Payments {
 										array( 'mode' => '0001' ),
 										array( 'payment_id' => $transaction->getPaymentID() )
 									);
-									add_post_meta( $order->get_id(), '_bkmode', '0001', true );
+									$order->update_meta_data( '_bkmode', '0001' );
+									$order->save();
 
 									$createResp = $this->createPayment(
 										$transaction->getOrderID(),
@@ -198,10 +197,10 @@ class Payments {
 
 									if ( isset( $createResp['redirect'] ) ) {
 										wp_safe_redirect( $createResp['redirect'] );
-										die();
+										wp_die();
 									}
 
-									echo wp_json_encode( $createResp );
+									wp_send_json( $createResp );
 								} else {
 									$message = 'Agreement cannot be done right now, cannot store in db, try again. ' . $agreementObj->errorMessage;
 									$message = $this->processResponse( $message );
@@ -248,30 +247,23 @@ class Payments {
 								}
 
 								// Store the transaction ID for WC 2.2 or later.
-								add_post_meta( $order->get_id(), '_transaction_id', $paymentResp['trxID'], true );
+								// order->set_transaction_id() already handles transaction meta.
 
 								// Add order note.
 								$order->add_order_note(
 									sprintf( 'bKash PGW payment approved (ID: %s)', $paymentResp['trxID'] )
 								);
 
-								if ( isset( $this->log ) && $this->log ) {
-									$this->log->add(
-										$this->id,
-										'bKash PGW payment approved (ID: ' . $response['trxID'] . ')'
-									);
-								}
+								Log::debug( 'bKash PGW payment approved (ID: ' . $paymentResp['trxID'] . ')' );
 
 								// Reduce stock levels.
 								wc_reduce_stock_levels( $order_id );
 
-								if ( isset( $this->log ) && $this->log ) {
-									$this->log->add( $this->id, 'Stocked reduced.' );
-								}
+								Log::debug( 'Stock reduced.' );
 
 								// Return thank you page redirect.
 								wp_safe_redirect( $orderPageURL );
-								die();
+								wp_die();
 							}
 
 							if ( $updated && isset( $paymentResp['paymentId'] ) && ! empty( $paymentResp['paymentId'] ) ) {
@@ -279,7 +271,7 @@ class Payments {
 
 								wc_add_notice( $msg, 'error' );
 								wp_safe_redirect( wc_get_checkout_url() );
-								die();
+								wp_die();
 							}
 							$message = 'Could not get transaction status';
 						} else {
@@ -321,18 +313,19 @@ class Payments {
 			$message = $this->processResponse( 'Transaction is ' . $status );
 		}
 
-		$order->add_order_note( 'bKash PGW payment declined (' . $message . ')' );
+		$order->add_order_note( 'bKash PGW payment declined (' . esc_html( $message ) . ')' );
 
+		$message = wp_kses_post( $message );
 		wc_add_notice( $message, 'error' );
 		wp_safe_redirect( wc_get_cart_url() );
 		
 		// Return message to customer.
-		die();
+		wp_die();
 	}
 
 
 	final public function processResponse( string $message ): string {
-		return "<h3 style='color:#fff;font-weight:bold;margin:0;font-size:20px;line-height: 14px;'>Payment Failed</h3>" . $message;
+		return "<h3 style='color:#fff;font-weight:bold;margin:0;font-size:20px;line-height: 14px;'>Payment Failed</h3>" . wp_kses_post( $message );
 	}
 
 	final public function cancelPayment( string $order_id ): array {

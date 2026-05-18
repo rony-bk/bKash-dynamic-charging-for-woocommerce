@@ -16,6 +16,7 @@ use function bKash\PGW\DC\WooCommerceBkashDC;
 	</h1>
 <br>
 <form action="#" method="post">
+	<?php wp_nonce_field( 'bkash_refund_transaction', 'bkash_refund_nonce' ); ?>
 
 	<table id="refund-table" aria-describedby="refund table">
 		<tr>
@@ -59,6 +60,7 @@ use function bKash\PGW\DC\WooCommerceBkashDC;
 
 <h1>Get Refund Status</h1>
 <form action="#" method="post">
+	<?php wp_nonce_field( 'bkash_refund_status', 'bkash_refund_status_nonce' ); ?>
 
 	<table id="refund-status-table" aria-describedby="Refund Status Table">
 		<tr>

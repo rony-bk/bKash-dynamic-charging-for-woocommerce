@@ -37,6 +37,7 @@ class TransferModule {
 			$type   = Sanitizer::safePostValue( 'transfer_type' ) ?? '';
 			$amount = Sanitizer::safePostValue( 'amount' ) ?? '';
 			if ( Sanitizer::safeServerValue( 'REQUEST_METHOD' ) === 'POST' ) {
+				check_admin_referer( 'bkash_transfer_balance', 'bkash_transfer_nonce' );
 				if ( $type && $amount ) {
 					$comm         = new BkashApi();
 					$transferCall = $comm->intraAccountTransfer( $amount, $type );
@@ -90,22 +91,27 @@ class TransferModule {
 			$invoice_no = Sanitizer::safePostValue( 'invoice_no' ) ?? '';
 			$initTime   = date( 'Y-m-d H:i:s' );
 
-			if ( ! empty( $receiver ) && ! empty( $amount ) && ! empty( $invoice_no ) ) {
-				$comm         = new BkashApi();
-				$transferCall = $comm->b2cPayout( $amount, $invoice_no, $receiver );
+			if ( Sanitizer::safeServerValue( 'REQUEST_METHOD' ) === 'POST' ) {
+				check_admin_referer( 'bkash_disburse_money', 'bkash_disburse_nonce' );
+				if ( ! empty( $receiver ) && ! empty( $amount ) && ! empty( $invoice_no ) ) {
+					$comm         = new BkashApi();
+					$transferCall = $comm->b2cPayout( $amount, $invoice_no, $receiver );
 
-				$validate = AdminUtility::validateResponse(
-					$transferCall,
-					array( 'transactionStatus' => 'Completed' )
-				);
-				if ( $validate['valid'] ) {
-					$transfer             = $validate['response'];
-					$transfer['initTime'] = $initTime;
+					$validate = AdminUtility::validateResponse(
+						$transferCall,
+						array( 'transactionStatus' => 'Completed' )
+					);
+					if ( $validate['valid'] ) {
+						$transfer             = $validate['response'];
+						$transfer['initTime'] = $initTime;
 
-					$save = self::buildAndSaveTransfer( $transfer );
-					$trx  = $transfer;
+						$save = self::buildAndSaveTransfer( $transfer );
+						$trx  = $transfer;
+					} else {
+						$trx = $validate['message'];
+					}
 				} else {
-					$trx = $validate['message'];
+					$trx = 'Receiver, amount and invoice number are required';
 				}
 			}
 		} catch ( Throwable $e ) {

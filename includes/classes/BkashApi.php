@@ -74,6 +74,15 @@ class BkashApi {
 		}
 	}
 
+	final public function isTokenValid(): bool {
+		if ( empty( $this->token ) ) {
+			return false;
+		}
+
+		$expiry = get_option( 'bkash_dc_grant_token_expiry' );
+		return is_numeric( $expiry ) && $expiry > time() && $this->isValidTokenFormat( $this->token );
+	}
+
 	final public function httpRequest($api_title,$url,&$http_status,$method = 'POST',$post_data = null,&$header = null,$grantHeader = false
 	): string {
 		$log  = "\n======== bKash PGW REQUEST LOG ========== \n\nAPI TITLE: $api_title \n";
@@ -95,8 +104,11 @@ class BkashApi {
 			$headers = array_merge( $headers, $header );
 		}
 
-		$log .= 'HEADERS: ' . wp_json_encode( $headers ) . "\n";
-		$log .= 'BODY: ' . wp_json_encode( $post_data ) . "\n";
+		// Log sanitized headers (exclude sensitive credentials and tokens)
+		$safe_headers = $headers;
+		unset( $safe_headers['username'], $safe_headers['password'], $safe_headers['authorization'], $safe_headers['x-app-key'] );
+		$log .= 'HEADERS: ' . wp_json_encode( $safe_headers ) . "\n";
+		$log .= 'BODY: [REDACTED - check WooCommerce logs for details]' . "\n";
 
 		$response = wp_remote_post(
 			$url,
@@ -111,26 +123,40 @@ class BkashApi {
 			)
 		);
 
-		$log .= 'RESPONSE: ' . wp_json_encode( $response ) . "\n\n";
+		$log .= 'RESPONSE: [REDACTED - check WooCommerce logs for details]' . "\n\n";
 
 		if ( is_wp_error( $response ) ) {
 			$http_status = - 1;
 			$body        = $response->get_error_message();
 
-			Log::error( 'CURL Error: = ' . $body );
+			Log::error( 'CURL Error occurred during API request to ' . $api_title );
 		} else {
 			// parsing http status code
 			$http_status = wp_remote_retrieve_response_code( $response );
 
-			if ( $http_status === 401 ) {
-				$this->readTokenFromAPI();
+			if ( $http_status === 401 && ! $grantHeader ) {
+				// Token might be expired, try to refresh once
+				Log::debug( 'Received 401, attempting token refresh' );
+				$this->resetToken();
+				$this->processToken();
+
+				if ( $this->isTokenValid() ) {
+					// Retry the request with new token
+					Log::debug( 'Retrying request with refreshed token' );
+					return $this->httpRequest( $api_title, $url, $http_status, $method, $post_data, $header, $grantHeader );
+				} else {
+					Log::error( 'Token refresh failed, cannot retry request' );
+				}
 			}
 
 			$header = wp_remote_retrieve_headers( $response );
 			$body   = wp_remote_retrieve_body( $response );
 		}
 
-		Log::debug( $log );
+		// Only log non-sensitive request details
+		if ( $this->debug === 'yes' ) {
+			Log::debug( $log );
+		}
 
 		return $body;
 	}
@@ -150,26 +176,61 @@ class BkashApi {
 	}
 
 	private function readTokenFromAPI() {
-		if ( empty( $this->app_key ) || empty( $this->app_secret ) ) {
-			Log::error( 'App key or secret is not set, required for bKash APIs' );
-		} else {
-			$get_token = $this->getToken();
-			if ( isset( $get_token['status_code'] ) && $get_token['status_code'] === 200 ) {
-				$response = json_decode( $get_token['response'], true );
-				if ( isset( $response['id_token'] ) ) {
-					$this->token = $response['id_token'];
-					$expiry      = time() + $response['expires_in'];
+		if ( empty( $this->app_key ) || empty( $this->app_secret ) || empty( $this->username ) || empty( $this->password ) ) {
+			Log::error( 'App key, secret, username, or password is not set, required for bKash APIs' );
+			return;
+		}
 
-					$this->addOrUpdateOption( 'bkash_dc_grant_token', $this->token );
-					$this->addOrUpdateOption( 'bkash_dc_grant_token_expiry', $expiry );
-					$this->addOrUpdateOption( 'bkash_dc_integration_product', $this->integration_product );
-				} else {
-					Log::error( 'Cannot read token from server, response ==> ' . wp_json_encode( $get_token ) );
+		$get_token = $this->getToken();
+		if ( isset( $get_token['status_code'] ) && $get_token['status_code'] === 200 ) {
+			$response = json_decode( $get_token['response'], true );
+
+			if ( json_last_error() !== JSON_ERROR_NONE ) {
+				Log::error( 'Invalid JSON response from token API' );
+				return;
+			}
+
+			if ( isset( $response['id_token'] ) && ! empty( $response['id_token'] ) ) {
+				// Validate token format (basic JWT structure check)
+				if ( ! $this->isValidTokenFormat( $response['id_token'] ) ) {
+					Log::error( 'Invalid token format received from API' );
+					return;
 				}
+
+				$this->token = sanitize_text_field( $response['id_token'] );
+
+				// Add buffer to expiry time (refresh 5 minutes before actual expiry)
+				$expires_in = isset( $response['expires_in'] ) ? intval( $response['expires_in'] ) : 3600;
+				$expiry     = time() + $expires_in - 300; // 5 minutes buffer
+
+				$this->addOrUpdateOption( 'bkash_dc_grant_token', $this->token );
+				$this->addOrUpdateOption( 'bkash_dc_grant_token_expiry', $expiry );
+				$this->addOrUpdateOption( 'bkash_dc_integration_product', $this->integration_product );
+
+				Log::debug( 'Token successfully refreshed and stored' );
 			} else {
-				Log::error( 'Cannot get response from get token API, response ==>' . wp_json_encode( $get_token ) );
+				Log::error( 'Token refresh failed: no id_token in response' );
+			}
+		} else {
+			Log::error( 'Token refresh failed: API returned status ' . ( $get_token['status_code'] ?? 'unknown' ) );
+		}
+	}
+
+	private function isValidTokenFormat( string $token ): bool {
+		// Basic JWT format validation (header.payload.signature)
+		$parts = explode( '.', $token );
+		if ( count( $parts ) !== 3 ) {
+			return false;
+		}
+
+		// Check if each part is base64url encoded
+		foreach ( $parts as $part ) {
+			if ( empty( $part ) || ! preg_match( '/^[a-zA-Z0-9_-]+$/', $part ) ) {
+				return false;
 			}
 		}
+
+		return true;
 	}
 
 	private function processToken() {
@@ -178,15 +239,23 @@ class BkashApi {
 			$expiry  = get_option( 'bkash_dc_grant_token_expiry' );
 			$product = get_option( 'bkash_dc_integration_product' );
 
-			// if expiry time in seconds is greater than current time
-			if ( $this->integration_product === $product && ! is_null( $token ) && ( $expiry - time() > 0 ) ) {
+			// Validate stored token format and expiry
+			if ( $this->integration_product === $product &&
+				 ! empty( $token ) &&
+				 is_numeric( $expiry ) &&
+				 $expiry > time() &&
+				 $this->isValidTokenFormat( $token ) ) {
+
 				$this->token = $token;
+				Log::debug( 'Using cached valid token' );
 			} else {
+				Log::debug( 'Token expired, invalid, or missing - refreshing from API' );
 				$this->readTokenFromAPI();
 			}
 		} catch ( Exception $e ) {
-			Log::debug( $e );
-			Log::error( 'bKash PGW ERROR: exception generated while processing token, ' . $e->getMessage() );
+			Log::error( 'bKash PGW ERROR: exception generated while processing token: ' . $e->getMessage() );
+			// Reset token on any exception to force fresh token on next attempt
+			$this->resetToken();
 		}
 	}
 
@@ -239,11 +308,21 @@ class BkashApi {
 	}
 
 	final public function getToken(): array {
+		// Validate required credentials before making API call
+		if ( empty( $this->app_key ) || empty( $this->app_secret ) || empty( $this->username ) || empty( $this->password ) ) {
+			Log::error( 'Missing required credentials for token request' );
+			return array(
+				'status_code' => 400,
+				'header'      => null,
+				'response'    => wp_json_encode( array( 'error' => 'Missing credentials' ) ),
+			);
+		}
+
 		$url = $this->constructed_url . 'auth/grant-token';
 
 		$body = array(
-			'app_key'    => $this->app_key,
-			'app_secret' => $this->app_secret,
+			'app_key'    => sanitize_text_field( $this->app_key ),
+			'app_secret' => sanitize_text_field( $this->app_secret ),
 		);
 
 		$response = $this->httpRequest( 'Grant Token', $url, $http_status, 'POST', $body, $header, true );
@@ -355,7 +434,6 @@ class BkashApi {
 	}
 
 	final public function capturePayment( string $payment_id ): array {
-		echo $payment_id;
 		return $this->executeCompleteOrCaptureVoid( $payment_id, 'capture' );
 	}
 

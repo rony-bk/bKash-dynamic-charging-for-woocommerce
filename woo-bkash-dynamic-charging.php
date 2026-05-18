@@ -2,11 +2,15 @@
 /**
  * Plugin Name:       bKash WooCommerce - Dynamic Charging
  * Description:       A bKash Dynamic Charging payment gateway plugin for WooCommerce.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Author:            bKash Limited
  * Author URI:        https://github.com/prabalsslw/woo-bkash-dynamic-charging
- * Requires at least: 5.1
- * Tested up to:      6.5.5
+ * Requires PHP:      8.0
+ * Requires at least: 6.0
+ * Tested up to:      6.9
+ * WC requires at least: 8.0
+ * WC tested up to:   10.7
+ * Requires Plugins:  woocommerce
  * Text Domain:       woo-bkash-dynamic-charging
  * Domain Path:       languages
  * Network:           false
@@ -29,10 +33,18 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// PHP version check
+if ( version_compare( PHP_VERSION, '8.0', '<' ) ) {
+    add_action( 'admin_notices', function() {
+        echo '<div class="error"><p><strong>bKash Dynamic Charging for WooCommerce</strong> requires PHP 8.0 or higher. You are running PHP ' . esc_html( PHP_VERSION ) . '. Please upgrade PHP.</p></div>';
+    } );
+    return;
+}
+
 define( 'BKASH_DC_BASE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BKASH_DC_BASE_URL', plugin_dir_url( __FILE__ ) );
 define( 'BKASH_DC_PLUGIN_SLUG', 'woo-bkash-dynamic-charging' );
-define( 'BKASH_DC_PLUGIN_VERSION', '1.0.0' );
+define( 'BKASH_DC_PLUGIN_VERSION', '1.0.1' );
 define( 'BKASH_DC_PLUGIN_BASEPATH', plugin_basename( __FILE__ ) );
 
 define( 'BKASH_DC_WC_API', '/wc-api/' );
@@ -66,3 +78,12 @@ if ( ! function_exists( 'WooCommerceBkashDC' ) ) {
  */
 $dashboard = new AdminDashboard();
 $dashboard->initiate();
+
+/**
+ * Declare bKash compatibility with WooCommerce HPOS
+ */
+add_action( 'before_woocommerce_init', function() {
+	if ( class_exists( 'Automattic\\WooCommerce\\Utilities\\FeaturesUtil' ) ) {
+		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', plugin_basename( __FILE__ ), true );
+	}
+} );

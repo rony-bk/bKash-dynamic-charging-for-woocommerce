@@ -1,10 +1,10 @@
 === bKash For WooCommerce ===
 Contributors: bkashpayment
 Tags: bKash,bKashPayment,bKashForWooCommerce,online payment,ecommerce,woocommerce
-Requires at least: 5.1
-Tested up to: 6.5.5
-Stable tag: 1.0.0
-Requires PHP: 7.0
+Requires at least: 6.0
+Tested up to: 6.9
+Stable tag: 1.0.1
+Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,10 +20,11 @@ bKash PGW plugin is available for Merchants in Bangladesh, to accepts payments f
 
 
 ### Technical Requirements:
-* Wordpress (4.0 or above).
-* WooCommerce (2.0 or above).
-* PHP (7.0 or above)
-* MySQL (5.6 or above)
+* WordPress 6.0 or above.
+* WooCommerce 8.0 or above.
+* PHP 8.0 or above.
+* MySQL 5.7 or above.
+* SSL certificate enabled on production sites.
 * Change in Permalink so that .htaccess can be rewritable. (https://wpengine.com/resources/wordpress-permalinks/)
 * File write permission for wp-content directory.
 
@@ -178,6 +179,12 @@ Ans: Visit this link for the tutorial - https://drive.google.com/file/d/11DLX8Kr
 = Process of bKash Checkout-Generate Final Log File (Checkout, Search, Error Case & Refund) Part-2.5 =
 Ans: Visit this link for the tutorial - https://drive.google.com/file/d/15hXTl-KG2RwI94JX3yBBUURQq9X5G2g8/view?usp=sharing
 
+== Upgrade Notice ==
+= 1.0.1 =
+* Updated compatibility for WordPress 6.9 and WooCommerce 8.0.
+* Added webhook request validation and secure JSON responses.
+* Merchants should verify webhook settings and test upgrades on staging before production.
+
 == Screenshots ==
 1. bKash payment method in Woocommerce payment method list
 2. Settings page of bKash payment method
@@ -185,5 +192,9 @@ Ans: Visit this link for the tutorial - https://drive.google.com/file/d/15hXTl-K
 4. Transaction list for admin to check
 
 == Changelog ==
+= 1.0.1 =
+* Added WP 6.9 and WooCommerce 8.0 compatibility.
+* Added webhook validation and JSON error handling.
+
 = 1.0.0 =
 * Tested upto wordpress 6.5.4
