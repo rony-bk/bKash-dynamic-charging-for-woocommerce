@@ -108,7 +108,9 @@ class BkashApi {
 		$safe_headers = $headers;
 		unset( $safe_headers['username'], $safe_headers['password'], $safe_headers['authorization'], $safe_headers['x-app-key'] );
 		$log .= 'HEADERS: ' . wp_json_encode( $safe_headers ) . "\n";
-		$log .= 'BODY: [REDACTED - check WooCommerce logs for details]' . "\n";
+
+		$safe_body = $this->redactSensitiveData( $post_data );
+		$log .= 'BODY: ' . $this->normalizeBodyForLog( $safe_body ) . "\n";
 
 		$response = wp_remote_post(
 			$url,
@@ -123,7 +125,9 @@ class BkashApi {
 			)
 		);
 
-		$log .= 'RESPONSE: [REDACTED - check WooCommerce logs for details]' . "\n\n";
+		$body          = is_wp_error( $response ) ? '' : wp_remote_retrieve_body( $response );
+		$safe_response = $this->redactSensitiveData( $body );
+		$log .= 'RESPONSE: ' . $this->normalizeBodyForLog( $safe_response ) . "\n\n";
 
 		if ( is_wp_error( $response ) ) {
 			$http_status = - 1;
@@ -159,6 +163,56 @@ class BkashApi {
 		}
 
 		return $body;
+	}
+
+	private function normalizeBodyForLog( $data ) {
+		if ( is_array( $data ) ) {
+			return wp_json_encode( $data, JSON_UNESCAPED_SLASHES );
+		}
+
+		if ( is_string( $data ) ) {
+			return $data;
+		}
+
+		return wp_json_encode( $data, JSON_UNESCAPED_SLASHES );
+	}
+
+	private function redactSensitiveData( $data ) {
+		if ( is_string( $data ) ) {
+			$decoded = json_decode( $data, true );
+			if ( json_last_error() === JSON_ERROR_NONE ) {
+				return $this->redactSensitiveData( $decoded );
+			}
+
+			return $data;
+		}
+
+		if ( is_array( $data ) ) {
+			foreach ( $data as $key => $value ) {
+				if ( $this->shouldRedactKey( $key ) ) {
+					$data[ $key ] = 'REDACTED';
+				} elseif ( is_array( $value ) || is_string( $value ) ) {
+					$data[ $key ] = $this->redactSensitiveData( $value );
+				}
+			}
+		}
+
+		return $data;
+	}
+
+	private function shouldRedactKey( $key ) {
+		return in_array( strtolower( $key ), array(
+			'app_secret',
+			'password',
+			'username',
+			'authorization',
+			'x-app-key',
+			'id_token',
+			'refresh_token',
+			'access_token',
+			'token',
+			'secret',
+		), true );
 	}
 
 	private function addOrUpdateOption( $key, $value ) {

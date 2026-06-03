@@ -181,11 +181,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
         add_action( 'woocommerce_api_' . $this->WEBHOOK_URL, array( $this, 'webhook' ) );
         // reset token when setting changes
         add_action( 'update_option', array( $this, 'onUpdateResetToken' ), 10, 3 );
-        add_action( 'before_woocommerce_init', function() {
-            if ( class_exists( '\\Automattic\\WooCommerce\\Utilities\\FeaturesUtil' ) ) {
-                \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', BKASH_DC_PLUGIN_BASEPATH, true );
-            }
-        } );
         add_action( 'woocommerce_thankyou_' . $this->id, array( $this, 'thankYouPage' ) );
     }
 
@@ -494,6 +489,21 @@ if (!class_exists('WC_Payment_Gateway')) return;
             $order_id = Sanitizer::safeGetValue( 'orderId' );
         }
 
+        // Temporary request diagnostics: write incoming request to plugin log to investigate blank pages.
+        try {
+            $debug = array(
+                'time' => date( 'c' ),
+                'request_method' => $_SERVER['REQUEST_METHOD'] ?? '',
+                'get' => $_GET ?? array(),
+                'post' => $_POST ?? array(),
+                'order_id' => $order_id,
+            );
+            $logfile = BKASH_DC_BASE_PATH . 'bkash-callback-debug.log';
+            @file_put_contents( $logfile, json_encode( $debug ) . "\n", FILE_APPEND | LOCK_EX );
+        } catch ( \Throwable $e ) {
+            // ignore logging failures
+        }
+
         // To receive order id
         $order = wc_get_order( $order_id );
         if ( $order ) {
@@ -510,6 +520,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
                 )
             );
         }
+        die();
     }
 
     public static function voidTransactionOnCanceled( $order_id, $order ) {

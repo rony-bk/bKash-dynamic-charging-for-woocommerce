@@ -152,6 +152,13 @@ class Payments {
 		$trx         = new Transaction();
 		$transaction = $trx->getTransaction( $invoice_id );
 
+		// Logger for diagnostics
+		$logger = null;
+		$log_context = array( 'source' => 'woo-bkash-dynamic-charging' );
+		if ( function_exists( 'wc_get_logger' ) ) {
+			$logger = wc_get_logger();
+			$logger->debug( 'executePayment called', array_merge( $log_context, array( 'order_id' => $order_id, 'payment_id' => $payment_id, 'invoice_id' => $invoice_id, 'orderPageURL' => $orderPageURL, 'callbackURL' => $callbackURL ) ) );
+		}
 
 		if ( $status === 'success' ) {
 
@@ -162,8 +169,21 @@ class Payments {
 					)
 				);
 
-				// EXECUTE OPERATION
-				$response = $this->bKash_object->executePayment( $payment_id );
+				// EXECUTE OPERATION (with diagnostics)
+				try {
+					$response = $this->bKash_object->executePayment( $payment_id );
+					if ( $logger ) {
+						$logger->debug( 'bKash executePayment response', array_merge( $log_context, array( 'response' => is_array( $response ) ? $response : (string) $response ) ) );
+					}
+				} catch ( \Throwable $e ) {
+					if ( $logger ) {
+						$logger->error( 'bKash executePayment exception: ' . $e->getMessage(), $log_context );
+					}
+					// Redirect back to checkout on fatal error to avoid blank page
+					wc_add_notice( 'Payment processing error. Please try again or contact support.', 'error' );
+					wp_safe_redirect( wc_get_checkout_url() );
+					wp_die();
+				}
 				if ( isset( $response['status_code'] ) && $response['status_code'] === 200 ) {
 					$mode = $transaction->getMode();
 
@@ -263,7 +283,7 @@ class Payments {
 
 								// Return thank you page redirect.
 								wp_safe_redirect( $orderPageURL );
-								wp_die();
+								die();
 							}
 
 							if ( $updated && isset( $paymentResp['paymentId'] ) && ! empty( $paymentResp['paymentId'] ) ) {
@@ -271,7 +291,7 @@ class Payments {
 
 								wc_add_notice( $msg, 'error' );
 								wp_safe_redirect( wc_get_checkout_url() );
-								wp_die();
+								die();
 							}
 							$message = 'Could not get transaction status';
 						} else {
@@ -320,7 +340,7 @@ class Payments {
 		wp_safe_redirect( wc_get_cart_url() );
 		
 		// Return message to customer.
-		wp_die();
+		die();
 	}
 
 

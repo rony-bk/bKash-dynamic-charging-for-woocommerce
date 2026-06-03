@@ -10,7 +10,7 @@
  * Tested up to:      6.9
  * WC requires at least: 8.0
  * WC tested up to:   10.7
- * Requires Plugins:  woocommerce
+ * Requires Plugins:  woocommerce/woocommerce.php
  * Text Domain:       woo-bkash-dynamic-charging
  * Domain Path:       languages
  * Network:           false
@@ -63,7 +63,7 @@ register_activation_hook( __FILE__, array( AdminDashboard::getInstance(), 'begin
 
 
 if ( ! class_exists( 'WooCommerceBkashDC' ) ) {
-    add_action( 'plugins_loaded', array( WooCommerceBkashDC::class, 'getInstance' ), 1 );
+    add_action( 'plugins_loaded', array( WooCommerceBkashDC::class, 'getInstance' ), 20 );
 }
 
 
@@ -79,11 +79,16 @@ if ( ! function_exists( 'WooCommerceBkashDC' ) ) {
 $dashboard = new AdminDashboard();
 $dashboard->initiate();
 
-/**
- * Declare bKash compatibility with WooCommerce HPOS
- */
-add_action( 'before_woocommerce_init', function() {
-	if ( class_exists( 'Automattic\\WooCommerce\\Utilities\\FeaturesUtil' ) ) {
-		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', plugin_basename( __FILE__ ), true );
-	}
+
+add_action( 'before_woocommerce_init', function () 
+{
+    if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
+
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
+            'custom_order_tables',
+            __FILE__,
+            true
+        );
+
+    }
 } );
