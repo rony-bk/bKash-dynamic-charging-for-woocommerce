@@ -38,14 +38,15 @@ if (!class_exists('WC_Payment_Gateway')) return;
 
     public $refundObj;
     public $refundError;
-    private $CALLBACK_URL         = 'bkashdc_payment_process';
-    private $SUCCESS_CALLBACK_URL = 'bkashdc_payment_success';
-    private $FAILURE_CALLBACK_URL = 'bkashdc_payment_failure';
-    private $EXECUTE_URL          = 'bkdc_execute';
-    private $PAYMENT_CANCEL_URL   = 'bkdc_cancel';
-    private $CANCEL_AGREEMENT_URL = 'bkdc_cancel_agreement';
-    private $REVIEW_ORDER_URL     = 'bkdc_review_order';
-    private $WEBHOOK_URL          = 'bkashdc_webhook';
+    private $CALLBACK_URL           = 'bkashdc_payment_process';
+    private $SUCCESS_CALLBACK_URL   = 'bkashdc_payment_success';
+    private $FAILURE_CALLBACK_URL   = 'bkashdc_payment_failure';
+    private $EXECUTE_URL            = 'bkdc_execute';
+    private $PAYMENT_CANCEL_URL     = 'bkdc_cancel';
+    private $AGREEMENT_CALLBACK_URL = 'bkdc_agreement_callback';
+    private $CANCEL_AGREEMENT_URL   = 'bkdc_cancel_agreement';
+    private $REVIEW_ORDER_URL       = 'bkdc_review_order';
+    private $WEBHOOK_URL            = 'bkashdc_webhook';
 
     /**
      * @var string|null
@@ -175,6 +176,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
         add_action( 'woocommerce_api_' . $this->FAILURE_CALLBACK_URL, array( $this, 'paymentFailure' ) );
         add_action( 'woocommerce_api_' . $this->EXECUTE_URL, array( $this, 'createPaymentCallbackProcess' ) );
         add_action( 'woocommerce_api_' . $this->PAYMENT_CANCEL_URL, array( $this, 'cancelPaymentProcess' ) );
+        add_action( 'woocommerce_api_' . $this->AGREEMENT_CALLBACK_URL, array( $this, 'createAgreementCallbackProcess' ) );
         // add_action( 'woocommerce_api_' . $this->CANCEL_AGREEMENT_URL, array( $this, 'cancelAgreementApi' ) );
         add_action( 'woocommerce_api_' . $this->REVIEW_ORDER_URL, array( $this, 'processReviewOrderPayment' ) );
 
@@ -212,9 +214,9 @@ if (!class_exists('WC_Payment_Gateway')) return;
                 'type'        => 'select',
                 'description' => 'Payment will be initiated with selected bKash PGW integration type',
                 'options'     => array(
-                    'paymentonly'    => 'Dynamic Charginmg - Without Agreement (Payment Only)',
-                    // 'tokenized'      => 'Tokenized (With Agreement)',
-                    // 'tokenized-both' => 'Tokenized (With and without Agreement)',
+                    'paymentonly'    => 'Without Agreement (Payment Only)',
+                    'tokenized'      => 'Tokenized (With Agreement)',
+                    'tokenized-both' => 'Tokenized (With and without Agreement)',
                 ),
                 'default'     => 'paymentonly',
                 'desc_tip'    => true,
@@ -419,8 +421,9 @@ if (!class_exists('WC_Payment_Gateway')) return;
 
     public function process_payment( $order_id ) {
         $cbURL = add_query_arg( 'orderId', $order_id, get_site_url() . BKASH_DC_WC_API . $this->CALLBACK_URL );
+        $agreementCbURL = add_query_arg( 'orderId', $order_id, get_site_url() . BKASH_DC_WC_API . $this->AGREEMENT_CALLBACK_URL );
 
-        return ( new Payments( $this->integration_type ) )->createPayment( $order_id, $this->intent, $cbURL );
+        return ( new Payments( $this->integration_type ) )->createPayment( $order_id, $this->intent, $cbURL, null, $agreementCbURL );
     }
 
     final public function paymentSuccess() {
@@ -489,6 +492,11 @@ if (!class_exists('WC_Payment_Gateway')) return;
             $order_id = Sanitizer::safeGetValue( 'orderId' );
         }
 
+        $agreement_id = Utils::safePostValue( 'agreementId' );
+		if ( ! $agreement_id ) {
+			$agreement_id = Utils::safeGetValue( 'agreementId' );
+		}
+
         // Temporary request diagnostics: write incoming request to plugin log to investigate blank pages.
         try {
             $debug = array(
@@ -511,7 +519,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
 
             $process = new Payments( $this->integration_type );
             // Debug output is handled by WooCommerce logger when enabled.
-            $process->executePayment( $this->get_return_url( $order ), $cbURL );
+            $process->executePayment( $this->get_return_url( $order ), $cbURL, $agreement_id );
         } else {
             echo wp_json_encode(
                 array(
@@ -522,6 +530,98 @@ if (!class_exists('WC_Payment_Gateway')) return;
         }
         die();
     }
+
+    /**
+	 * Agreement Callback Handler
+	 *
+	 * Called when bKash redirects the user back after agreement approval/failure/cancel.
+	 * bKash sends: orderId, agreementId, status, signature (no paymentID or invoiceID).
+	 * Looks up the transaction by order_id, then calls handleAgreementCallback.
+	 */
+	final public function createAgreementCallbackProcess() {
+		$order_id = Utils::safeGetValue( 'orderId' );
+		$status   = Utils::safeGetValue( 'status' );
+		$agreement_id = Utils::safeGetValue( 'agreementId' );
+
+		if ( empty( $order_id ) ) {
+			wc_add_notice( 'Order ID is missing.', 'error' );
+			wp_safe_redirect( wc_get_checkout_url() );
+			die();
+		}
+
+		$order = wc_get_order( $order_id );
+		if ( ! $order ) {
+			wc_add_notice( 'Order not found.', 'error' );
+			wp_safe_redirect( wc_get_checkout_url() );
+			die();
+		}
+
+		$trx         = new Models\Transaction();
+		$transaction = $trx->getTransactionByOrderId( $order_id );
+
+		if ( ! $transaction || $transaction->getMode() !== '1000' ) {
+			wc_add_notice( 'Agreement transaction not found for this order.', 'error' );
+			wp_safe_redirect( wc_get_checkout_url() );
+			die();
+		}
+
+		$process = new Payments( $this->integration_type );
+		if ( $status === 'success' ) {
+			$transaction->update( array( 'status' => 'CALLBACK_REACHED' ) );
+
+			$agreementResult = $process->handleAgreementCallback(
+				$agreement_id,
+				$order->get_user_id()
+			);
+
+			if ( $agreementResult['success'] ) {
+				$transaction->update( array( 'status' => 'AgreementCompleted', 'mode' => '1001' ) );
+				$order->update_meta_data( '_bkmode', '1001' );
+				if ( method_exists( $order, 'save' ) ) {
+					$order->save();
+				}
+
+				// Agreement completed — now create the actual payment using the new agreement
+				$paymentCbURL = get_site_url() . BKASH_FW_WC_API . $this->CALLBACK_URL . '?orderId=' . $order_id;
+				$paymentResult = $process->createPayment(
+					$order_id,
+					$this->intent,
+					$paymentCbURL,
+					null,
+					'',
+					$agreementResult['agreementID']
+				);
+
+				if ( isset( $paymentResult['result'] ) && $paymentResult['result'] === 'success' && ! empty( $paymentResult['redirect'] ) ) {
+					wp_redirect( $paymentResult['redirect'] );
+					die();
+				}
+
+				// Payment creation failed after agreement success
+				$errorMsg = $paymentResult['message'] ?? 'Payment creation failed after agreement.';
+				$order->add_order_note( 'bKash Agreement succeeded but payment creation failed: ' . $errorMsg );
+				wc_add_notice( $errorMsg, 'error' );
+				wp_safe_redirect( wc_get_checkout_url() );
+				die();
+			} else {
+				$transaction->update( array( 'status' => 'AgreementFailed' ) );
+				$order->add_order_note( 'bKash Agreement failed: ' . ( $agreementResult['message'] ?? '' ) );
+
+				wc_add_notice( $agreementResult['message'] ?? 'Agreement execution failed.', 'error' );
+				wp_safe_redirect( wc_get_checkout_url() );
+				die();
+			}
+		}
+
+		// Agreement was cancelled or failed at bKash
+		$statusLabel = str_replace( array( 'cancel', 'failure' ), array( 'Cancelled', 'Failed' ), $status );
+		$transaction->update( array( 'status' => $statusLabel ) );
+		$order->add_order_note( 'bKash Agreement ' . $statusLabel );
+
+		wc_add_notice( 'bKash Agreement ' . $statusLabel, 'error' );
+		wp_safe_redirect( wc_get_checkout_url() );
+		die();
+	}
 
     public static function voidTransactionOnCanceled( $order_id, $order ) {
         $trx            = '';

@@ -1,4 +1,15 @@
 <?php 
+/**
+ * Api Communicator
+ *
+ * @category    Api
+ * @package     woo-bkash-dynamic-charging
+ * @author      bKash Developer <developer@bkash.com>
+ * @copyright   Copyright 2026 bKash Limited. All rights reserved.
+ * @license     GNU General Public License version 2 or later; see LICENSE
+ * @link        https://bkash.com
+ */
+
 namespace bKash\PGW\DC;
 
 use Exception;
@@ -41,7 +52,7 @@ class BkashApi {
 		$this->intent              = $this->getOptions( 'intent', 'sale' );
 		$this->api_version         = $this->getOptions( 'bkash_api_version', 'v1' );
 		$this->enable_b2c = $this->getOptions( 'enable_b2c' );
-		$this->sandbox    = $this->getOptions( 'sandbox' );
+		$this->sandbox    = $this->getOptions( 'sandbox', false );
 		$this->app_key    = $this->getOptions( 'app_key' );
 		$this->app_secret = $this->getOptions( 'app_secret' );
 		$this->username   = $this->getOptions( 'username' );
@@ -70,7 +81,33 @@ class BkashApi {
 			$this->constructed_url = $api_Base_url. $this->api_version . "/";
 		}
 		else {
-			wc_add_notice( "bKash Payment Plugin Not Activate!", 'error' );
+			Log::error( 'bKash Payment Plugin Not Activate!' );
+		}
+	}
+
+	private function processToken() {
+		try {
+			$token   = get_option( 'bkash_dc_grant_token' );
+			$expiry  = get_option( 'bkash_dc_grant_token_expiry' );
+			$product = get_option( 'bkash_dc_integration_product' );
+
+			// Validate stored token format and expiry
+			if ( $this->integration_product === $product &&
+				 ! empty( $token ) &&
+				 is_numeric( $expiry ) &&
+				 ( $expiry - time() > 0 ) &&
+				 $this->isValidTokenFormat( $token ) ) {
+
+				$this->token = $token;
+			} else {
+				Log::debug( 'Token expired, invalid, or missing - refreshing from API' );
+				$this->readTokenFromAPI();
+			}
+		} catch ( Exception $e ) {
+			Log::debug( $e );
+			Log::error( 'bKash PGW ERROR: exception generated while processing token: ' . $e->getMessage() );
+			// Reset token on any exception to force fresh token on next attempt
+			$this->resetToken();
 		}
 	}
 
@@ -81,6 +118,451 @@ class BkashApi {
 
 		$expiry = get_option( 'bkash_dc_grant_token_expiry' );
 		return is_numeric( $expiry ) && $expiry > time() && $this->isValidTokenFormat( $this->token );
+	}
+
+	final public function resetToken() {
+		delete_option( 'bkash_dc_grant_token' );
+		delete_option( 'bkash_dc_grant_token_expiry' );
+		delete_option( 'bkash_dc_integration_product' );
+	}
+
+	private function readTokenFromAPI() {
+		if ( empty( $this->app_key ) || empty( $this->app_secret ) || empty( $this->username ) || empty( $this->password ) ) {
+			Log::error( 'App key, secret, username, or password is not set, required for bKash APIs' );
+			return;
+		}
+
+		$get_token = $this->getToken();
+		if ( isset( $get_token['status_code'] ) && $get_token['status_code'] === 200 ) {
+			$response = json_decode( $get_token['response'], true );
+
+			if ( json_last_error() !== JSON_ERROR_NONE ) {
+				Log::error( 'Invalid JSON response from token API' );
+				return;
+			}
+
+			if ( isset( $response['id_token'] ) && ! empty( $response['id_token'] ) ) {
+				// Validate token format (basic JWT structure check)
+				if ( ! $this->isValidTokenFormat( $response['id_token'] ) ) {
+					Log::error( 'Invalid token format received from API' );
+					return;
+				}
+
+				$this->token = sanitize_text_field( $response['id_token'] );
+
+				// Add buffer to expiry time (refresh 5 minutes before actual expiry)
+				$expires_in = isset( $response['expires_in'] ) ? intval( $response['expires_in'] ) : 3600;
+				$expiry     = time() + $expires_in - 300; // 5 minutes buffer
+
+				$this->addOrUpdateOption( 'bkash_dc_grant_token', $this->token );
+				$this->addOrUpdateOption( 'bkash_dc_grant_token_expiry', $expiry );
+				$this->addOrUpdateOption( 'bkash_dc_integration_product', $this->integration_product );
+
+				Log::debug( 'Token successfully refreshed and stored' );
+			} else {
+				Log::error( 'Token refresh failed: no id_token in response' );
+			}
+		} else {
+			Log::error( 'Token refresh failed: API returned status ' . ( $get_token['status_code'] ?? 'unknown' ) );
+		}
+	}
+
+	final public function getToken(): array {
+		$url = $this->constructed_url . 'auth/grant-token';
+		// Validate required credentials before making API call
+		if ( empty( $this->app_key ) || empty( $this->app_secret ) || empty( $this->username ) || empty( $this->password ) ) {
+			Log::error( 'Missing required credentials for token request' );
+			return array(
+				'status_code' => 400,
+				'header'      => null,
+				'response'    => wp_json_encode( array( 'error' => 'Missing credentials' ) ),
+			);
+		}
+
+		$body = array(
+			'app_key'    => sanitize_text_field( $this->app_key ),
+			'app_secret' => sanitize_text_field( $this->app_secret ),
+		);
+
+		$response = $this->httpRequest( 'Grant Token', $url, $http_status, 'POST', $body, $header, true );
+
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
+	}
+
+	private function isValidTokenFormat( string $token ): bool {
+		// Basic JWT format validation (header.payload.signature)
+		$parts = explode( '.', $token );
+		if ( count( $parts ) !== 3 ) {
+			return false;
+		}
+
+		// Check if each part is base64url encoded
+		foreach ( $parts as $part ) {
+			if ( empty( $part ) || ! preg_match( '/^[a-zA-Z0-9_-]+$/', $part ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	final public function createPayment( array $params, string $mode ): array {
+		$url = $this->constructed_url . 'payment/create';
+		$api_title = ($mode === '1011') ? 'Create Payment' : 'Create Payment With Agreement';
+
+		$body = array(
+			'mode'                    => $mode,
+			'agreementId'             => $params['agreementId'] ?? '',
+			'payerReference'          => $params['payerReference'] ?? '',
+			'callbackURL'             => $params['callbackURL'] ?? '',
+			'amount'                  => $params['amount'] ?? '',
+			'currency'                => $params['currency'] ?? '',
+			'intent'                  => $params['intent'] ?? '',
+			'merchantInvoiceNumber'   => $params['merchantInvoiceNumber'] ?? '',
+			'merchantAssociationInfo' => $params['merchantAssociationInfo'] ?? '',
+		);
+
+		$response = $this->httpRequest( $api_title, $url, $http_status, 'POST', $body, $header );
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
+	}
+
+	final public function executePayment( string $payment_id, string $agreement_id = '' ): array {
+		$url      = $this->constructed_url . 'payment/execute';
+		$apiTitle = 'Payment Execute';
+		$body     = array( 
+			'paymentId' => $payment_id,
+			'agreementId' => $agreement_id
+		);
+
+		$response = $this->httpRequest( $apiTitle, $url, $http_status, 'POST', $body, $header );
+
+		// QUERY PAYMENT IN CASE OF ANY NETWORK OR NO RESPONSE OR TIMED OUT ISSUE
+		$decoded_response = isset( $response['response'] ) && is_string( $response['response'] ) ?
+			json_decode( $response['response'], true ) : array();
+
+		if ( $http_status !== 200 || isset( $decoded_response['message'] ) ) {
+			return $this->queryPayment( $payment_id, $agreement_id );
+		}
+
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
+
+		// return $this->executeCompleteOrCaptureVoid( $payment_id, 'execute' );
+	}
+
+	final public function queryPayment( string $payment_id, string $agreement_id = '' ): array {
+		$url = $this->constructed_url . 'query/payment';
+
+		$body = array(
+			'paymentId' => $payment_id,
+			'agreementId' => $agreement_id
+		);
+
+		$response = $this->httpRequest( 'Query Payment', $url, $http_status, 'POST', $body, $header );
+
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
+	}
+
+	/**
+	 * Create Agreement
+	 *
+	 * Calls the bKash API to create an agreement.
+	 * @param array $params ['payerReference', 'callbackURL']
+	 * @return array
+	 */
+	final public function agreementCreate(array $params): array {
+		$url = $this->constructed_url . 'agreement/create';
+		$body = [
+			'payerReference' => $params['payerReference'] ?? '',
+			'callbackURL'    => $params['callbackURL'] ?? '',
+		];
+
+		$response = $this->httpRequest('Create Agreement', $url, $http_status, 'POST', $body, $header);
+		return [
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		];
+	}
+
+	/**
+	 * Execute Agreement
+	 *
+	 * Calls the bKash API to execute an agreement.
+	 * @param string $agreementId
+	 * @return array
+	 */
+	final public function agreementExecute(string $agreementId): array {
+		$url = $this->constructed_url . 'agreement/execute';
+		$body = [
+			'agreementId' => $agreementId,
+		];
+
+		$response = $this->httpRequest('Execute Agreement', $url, $http_status, 'POST', $body, $header);
+
+		return [
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		];
+	}
+
+	/**
+	 * Agreement Query
+	 *
+	 * Get agreement status using bKash agreement ID.
+	 *
+	 * @param string $agreement_id
+	 *
+	 * @return array
+	 */
+	final public function queryAgreement( string $agreement_id ): array {
+		$url = $this->constructed_url . 'query/agreement';
+
+		$body = array(
+			'agreementId' => $agreement_id,
+		);
+
+		$response = $this->httpRequest( 'Agreement Query', $url, $http_status, 'POST', $body, $header );
+
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
+	}
+
+	/**
+	 * Agreement Cancellation
+	 *
+	 * Cancel an agreement using bKash agreement ID.
+	 *
+	 * @param string $agreement_id
+	 *
+	 * @return array
+	 */
+	final public function agreementCancel( string $agreement_id ): array {
+		$url = $this->constructed_url . 'agreement/cancel';
+
+		$body = array(
+			'agreementId' => $agreement_id,
+		);
+
+		$response = $this->httpRequest( 'Agreement Cancel', $url, $http_status, 'POST', $body, $header );
+
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
+	}
+
+	final public function searchTransaction( string $trx_id ): array {
+		$url = $this->constructed_url.'search/transaction';
+
+		if ( !empty($trx_id) ) {
+			$body = array(
+				'trxID' => $trx_id,
+			);
+
+			$response = $this->httpRequest( 'DC Search Transaction', $url, $http_status, 'POST', $body, $header );
+		}
+
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
+	}
+
+	final public function refund( $amount, $paymentID, $trxID, $SKU, $reason ): array {
+		$url = $this->constructed_url . 'payment/refund';
+
+		$body = array(
+			'amount'    => $amount,
+			'paymentId' => $paymentID,
+			'trxID'     => $trxID,
+			'sku'       => $SKU,
+			'reason'    => $reason,
+		);
+
+		$response = $this->httpRequest( 'Refund', $url, $http_status, 'POST', $body, $header );
+
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
+	}
+
+	final public function refundStatus( $paymentID, $trxID ): array {
+		$url = $this->constructed_url . 'query/refund';
+
+		$body = array(
+			'paymentId' => $paymentID,
+			'trxID'     => $trxID,
+		);
+
+		$response = $this->httpRequest( 'Query Refund', $url, $http_status, 'POST', $body, $header );
+
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
+	}
+
+	final public function executeCompleteOrCaptureVoid( string $payment_id, string $type ): array {
+		switch ( $type ) {
+			case 'execute':
+				$api_path     = 'payment/execute';
+				$extra_in_url = '';
+				break;
+			case 'capture':
+				$api_path     = 'payment/confirm';
+				$extra_in_url = '';
+				break;
+			case 'void':
+				$api_path     = 'payment/confirm';
+				$extra_in_url = '';
+				break;
+			default:
+				$api_path     = '';
+				$extra_in_url = '';
+		}
+
+		
+		$url      = $this->constructed_url . $api_path . $extra_in_url;
+		$apiTitle = 'DC ' . ucwords( $type ) . ' Payment';
+		if($type == 'capture' || $type == 'void') {
+			$body     = array( 
+				'paymentId' => $payment_id,
+				'confirmationType' => $type
+			);
+		} else {
+			$body     = array( 'paymentId' => $payment_id );
+		}
+
+		$response = $this->httpRequest($apiTitle,$url,$http_status,'POST',$body,$header);
+
+		// QUERY PAYMENT IN CASE OF ANY NETWORK OR NO RESPONSE OR TIMED OUT ISSUE
+		$decoded_response = isset( $response['response'] ) && is_string( $response['response'] ) ?
+			json_decode( $response['response'], true ) : array();
+
+		if ( $http_status !== 200 || isset( $decoded_response['message'] ) ) {
+			return $this->queryPayment( $payment_id );
+		}
+
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
+	}
+
+	final public function capturePayment( string $payment_id ): array {
+		return $this->executeCompleteOrCaptureVoid( $payment_id, 'capture' );
+	}
+
+	final public function voidPayment( string $payment_id ): array {
+		return $this->executeCompleteOrCaptureVoid( $payment_id, 'void' );
+	}
+
+	final public function checkBalances(): array {
+		$url = $this->constructed_url . 'query/organization/balance';
+
+		$response = $this->httpRequest( 'Query Organization Balance', $url, $http_status, 'GET', null, $header );
+
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
+
+		// throw new UnexpectedValueException( 'Query organization balance is only available in Checkout integration' );
+	}
+
+	final public function initiatePayout( $type ): array {
+		$url = $this->constructed_url . 'payout/initiate';
+
+		$body = array(
+			'type' => $type,
+    		'reference' => $type  
+		);
+
+		$response = $this->httpRequest( 'Initiate Payout', $url, $http_status, 'POST', $body, $header );
+
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
+		// throw new UnexpectedValueException( 'Intra Account Transfer is only available in Checkout integration' );
+	}
+
+	final public function intraAccountTransfer( $amount, string $transferType ): array {
+		$url = $this->constructed_url . 'payout/intra-account/transfer';
+		
+		$initiatePayoutResponse = $this->initiatePayout("INTRA");
+		$arrayResponse = json_decode($initiatePayoutResponse['response'], true);
+		$payoutId = $arrayResponse['payoutID'];
+
+		$body = array(
+			'payoutID' => $payoutId,
+		    'amount' => $amount,
+		    'currency' => 'BDT',
+		    'transferType' => $transferType
+		);
+
+		$response = $this->httpRequest( 'Intra Account Transfer', $url, $http_status, 'POST', $body, $header );
+
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
+		// throw new UnexpectedValueException( 'Intra Account Transfer is only available in Checkout integration' );
+	}
+
+	final public function b2cPayout( $amount, string $invoiceNumber, string $receiver ): array {
+		$url = $this->constructed_url . 'payout/b2c';
+
+		$initiatePayoutResponse = $this->initiatePayout("B2C");
+		$arrayResponse = json_decode($initiatePayoutResponse['response'], true);
+		$payoutId = $arrayResponse['payoutID'];
+
+		$body = array(
+			'payoutID' 				=> $payoutId,
+		    'amount' 				=> $amount,
+		    'currency' 				=> "BDT",
+		    'merchantInvoiceNumber' => $invoiceNumber,
+		    'receiverMSISDN' 		=> $receiver
+		);
+
+		$response = $this->httpRequest( 'B2C Payout', $url, $http_status, 'POST', $body, $header );
+
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
+
+		// throw  new UnexpectedValueException( 'B2C Payout is only available in Checkout integration' );
 	}
 
 	final public function httpRequest($api_title,$url,&$http_status,$method = 'POST',$post_data = null,&$header = null,$grantHeader = false
@@ -98,7 +580,7 @@ class BkashApi {
 		} else {
 			$headers['authorization'] = $this->token;
 			$headers['x-app-key']     = $this->app_key;
-			$headers['authorization'];
+			// $headers['authorization'];
 		}
 		if ( ! is_null( $header ) ) {
 			$headers = array_merge( $headers, $header );
@@ -221,359 +703,5 @@ class BkashApi {
 		} else {
 			update_option( $key, $value );
 		}
-	}
-
-	final public function resetToken() {
-		delete_option( 'bkash_dc_grant_token' );
-		delete_option( 'bkash_dc_grant_token_expiry' );
-		delete_option( 'bkash_dc_integration_product' );
-	}
-
-	private function readTokenFromAPI() {
-		if ( empty( $this->app_key ) || empty( $this->app_secret ) || empty( $this->username ) || empty( $this->password ) ) {
-			Log::error( 'App key, secret, username, or password is not set, required for bKash APIs' );
-			return;
-		}
-
-		$get_token = $this->getToken();
-		if ( isset( $get_token['status_code'] ) && $get_token['status_code'] === 200 ) {
-			$response = json_decode( $get_token['response'], true );
-
-			if ( json_last_error() !== JSON_ERROR_NONE ) {
-				Log::error( 'Invalid JSON response from token API' );
-				return;
-			}
-
-			if ( isset( $response['id_token'] ) && ! empty( $response['id_token'] ) ) {
-				// Validate token format (basic JWT structure check)
-				if ( ! $this->isValidTokenFormat( $response['id_token'] ) ) {
-					Log::error( 'Invalid token format received from API' );
-					return;
-				}
-
-				$this->token = sanitize_text_field( $response['id_token'] );
-
-				// Add buffer to expiry time (refresh 5 minutes before actual expiry)
-				$expires_in = isset( $response['expires_in'] ) ? intval( $response['expires_in'] ) : 3600;
-				$expiry     = time() + $expires_in - 300; // 5 minutes buffer
-
-				$this->addOrUpdateOption( 'bkash_dc_grant_token', $this->token );
-				$this->addOrUpdateOption( 'bkash_dc_grant_token_expiry', $expiry );
-				$this->addOrUpdateOption( 'bkash_dc_integration_product', $this->integration_product );
-
-				Log::debug( 'Token successfully refreshed and stored' );
-			} else {
-				Log::error( 'Token refresh failed: no id_token in response' );
-			}
-		} else {
-			Log::error( 'Token refresh failed: API returned status ' . ( $get_token['status_code'] ?? 'unknown' ) );
-		}
-	}
-
-	private function isValidTokenFormat( string $token ): bool {
-		// Basic JWT format validation (header.payload.signature)
-		$parts = explode( '.', $token );
-		if ( count( $parts ) !== 3 ) {
-			return false;
-		}
-
-		// Check if each part is base64url encoded
-		foreach ( $parts as $part ) {
-			if ( empty( $part ) || ! preg_match( '/^[a-zA-Z0-9_-]+$/', $part ) ) {
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-	private function processToken() {
-		try {
-			$token   = get_option( 'bkash_dc_grant_token' );
-			$expiry  = get_option( 'bkash_dc_grant_token_expiry' );
-			$product = get_option( 'bkash_dc_integration_product' );
-
-			// Validate stored token format and expiry
-			if ( $this->integration_product === $product &&
-				 ! empty( $token ) &&
-				 is_numeric( $expiry ) &&
-				 $expiry > time() &&
-				 $this->isValidTokenFormat( $token ) ) {
-
-				$this->token = $token;
-				Log::debug( 'Using cached valid token' );
-			} else {
-				Log::debug( 'Token expired, invalid, or missing - refreshing from API' );
-				$this->readTokenFromAPI();
-			}
-		} catch ( Exception $e ) {
-			Log::error( 'bKash PGW ERROR: exception generated while processing token: ' . $e->getMessage() );
-			// Reset token on any exception to force fresh token on next attempt
-			$this->resetToken();
-		}
-	}
-
-	final public function executeCompleteOrCaptureVoid( string $payment_id, string $type ): array {
-		switch ( $type ) {
-			case 'execute':
-				$api_path     = 'payment/execute';
-				$extra_in_url = '';
-				break;
-			case 'capture':
-				$api_path     = 'payment/confirm';
-				$extra_in_url = '';
-				break;
-			case 'void':
-				$api_path     = 'payment/confirm';
-				$extra_in_url = '';
-				break;
-			default:
-				$api_path     = '';
-				$extra_in_url = '';
-		}
-
-		
-		$url      = $this->constructed_url . $api_path . $extra_in_url;
-		$apiTitle = 'DC ' . ucwords( $type ) . ' Payment';
-		if($type == 'capture' || $type == 'void') {
-			$body     = array( 
-				'paymentId' => $payment_id,
-				'confirmationType' => $type
-			);
-		} else {
-			$body     = array( 'paymentId' => $payment_id );
-		}
-
-		$response = $this->httpRequest($apiTitle,$url,$http_status,'POST',$body,$header);
-
-		// QUERY PAYMENT IN CASE OF ANY NETWORK OR NO RESPONSE OR TIMED OUT ISSUE
-		$decoded_response = isset( $response['response'] ) && is_string( $response['response'] ) ?
-			json_decode( $response['response'], true ) : array();
-
-		if ( $http_status !== 200 || isset( $decoded_response['message'] ) ) {
-			return $this->queryPayment( $payment_id );
-		}
-
-		return array(
-			'status_code' => $http_status,
-			'header'      => $header,
-			'response'    => $response,
-		);
-	}
-
-	final public function getToken(): array {
-		// Validate required credentials before making API call
-		if ( empty( $this->app_key ) || empty( $this->app_secret ) || empty( $this->username ) || empty( $this->password ) ) {
-			Log::error( 'Missing required credentials for token request' );
-			return array(
-				'status_code' => 400,
-				'header'      => null,
-				'response'    => wp_json_encode( array( 'error' => 'Missing credentials' ) ),
-			);
-		}
-
-		$url = $this->constructed_url . 'auth/grant-token';
-
-		$body = array(
-			'app_key'    => sanitize_text_field( $this->app_key ),
-			'app_secret' => sanitize_text_field( $this->app_secret ),
-		);
-
-		$response = $this->httpRequest( 'Grant Token', $url, $http_status, 'POST', $body, $header, true );
-
-		return array(
-			'status_code' => $http_status,
-			'header'      => $header,
-			'response'    => $response,
-		);
-	}
-
-	final public function makePayment( array $params ): array {
-		$url = $this->constructed_url . 'payment/create';
-
-		$body = array(
-			'mode'                    => $params['mode'] ?? '',
-			'payerReference'          => $params['payerReference'] ?? '',
-			'callbackURL'             => $params['callbackURL'] ?? '',
-			'agreementID'             => $params['agreementID'] ?? '',
-			'amount'                  => $params['amount'] ?? '',
-			'currency'                => $params['currency'] ?? '',
-			'intent'                  => $params['intent'] ?? '',
-			'merchantInvoiceNumber'   => $params['merchantInvoiceNumber'] ?? '',
-			'merchantAssociationInfo' => $params['merchantAssociationInfo'] ?? '',
-		);
-
-		$response = $this->httpRequest( 'Create Payment', $url, $http_status, 'POST', $body, $header );
-
-		return array(
-			'status_code' => $http_status,
-			'header'      => $header,
-			'response'    => $response,
-		);
-	}
-
-	final public function executePayment( string $payment_id ): array {
-		return $this->executeCompleteOrCaptureVoid( $payment_id, 'execute' );
-	}
-
-	final public function queryPayment( string $payment_id ): array {
-		$url = $this->constructed_url . 'query/payment';
-
-		$body = array(
-			'paymentID' => $payment_id,
-		);
-
-		$response = $this->httpRequest( 'Query Payment', $url, $http_status, 'POST', $body, $header );
-
-		return array(
-			'status_code' => $http_status,
-			'header'      => $header,
-			'response'    => $response,
-		);
-	}
-
-	final public function searchTransaction( string $trx_id ): array {
-		$url = $this->constructed_url.'search/transaction';
-
-		if ( !empty($trx_id) ) {
-			$body = array(
-				'trxID' => $trx_id,
-			);
-
-			$response = $this->httpRequest( 'DC Search Transaction', $url, $http_status, 'POST', $body, $header );
-		}
-
-		return array(
-			'status_code' => $http_status,
-			'header'      => $header,
-			'response'    => $response,
-		);
-	}
-
-	final public function refund( $amount, $paymentID, $trxID, $SKU, $reason ): array {
-		$url = $this->constructed_url . 'payment/refund';
-
-		$body = array(
-			'amount'    => $amount,
-			'paymentId' => $paymentID,
-			'trxID'     => $trxID,
-			'sku'       => $SKU,
-			'reason'    => $reason,
-		);
-
-		$response = $this->httpRequest( 'Refund', $url, $http_status, 'POST', $body, $header );
-
-		return array(
-			'status_code' => $http_status,
-			'header'      => $header,
-			'response'    => $response,
-		);
-	}
-
-	final public function refundStatus( $paymentID, $trxID ): array {
-		$url = $this->constructed_url . 'query/refund';
-
-		$body = array(
-			'paymentId' => $paymentID,
-			'trxID'     => $trxID,
-		);
-
-		$response = $this->httpRequest( 'Query Refund', $url, $http_status, 'POST', $body, $header );
-
-		return array(
-			'status_code' => $http_status,
-			'header'      => $header,
-			'response'    => $response,
-		);
-	}
-
-	final public function capturePayment( string $payment_id ): array {
-		return $this->executeCompleteOrCaptureVoid( $payment_id, 'capture' );
-	}
-
-	final public function voidPayment( string $payment_id ): array {
-		return $this->executeCompleteOrCaptureVoid( $payment_id, 'void' );
-	}
-
-	final public function checkBalances(): array {
-		$url = $this->constructed_url . 'query/organization/balance';
-
-		$response = $this->httpRequest( 'Query Organization Balance', $url, $http_status, 'GET', null, $header );
-
-		return array(
-			'status_code' => $http_status,
-			'header'      => $header,
-			'response'    => $response,
-		);
-
-		// throw new UnexpectedValueException( 'Query organization balance is only available in Checkout integration' );
-	}
-
-	final public function initiatePayout( $type ): array {
-		$url = $this->constructed_url . 'payout/initiate';
-
-		$body = array(
-			'type' => $type,
-    		'reference' => $type  
-		);
-
-		$response = $this->httpRequest( 'Initiate Payout', $url, $http_status, 'POST', $body, $header );
-
-		return array(
-			'status_code' => $http_status,
-			'header'      => $header,
-			'response'    => $response,
-		);
-		// throw new UnexpectedValueException( 'Intra Account Transfer is only available in Checkout integration' );
-	}
-
-	final public function intraAccountTransfer( $amount, string $transferType ): array {
-		$url = $this->constructed_url . 'payout/intra-account/transfer';
-		
-		$initiatePayoutResponse = $this->initiatePayout("INTRA");
-		$arrayResponse = json_decode($initiatePayoutResponse['response'], true);
-		$payoutId = $arrayResponse['payoutID'];
-
-		$body = array(
-			'payoutID' => $payoutId,
-		    'amount' => $amount,
-		    'currency' => 'BDT',
-		    'transferType' => $transferType
-		);
-
-		$response = $this->httpRequest( 'Intra Account Transfer', $url, $http_status, 'POST', $body, $header );
-
-		return array(
-			'status_code' => $http_status,
-			'header'      => $header,
-			'response'    => $response,
-		);
-		// throw new UnexpectedValueException( 'Intra Account Transfer is only available in Checkout integration' );
-	}
-
-	final public function b2cPayout( $amount, string $invoiceNumber, string $receiver ): array {
-		$url = $this->constructed_url . 'payout/b2c';
-
-		$initiatePayoutResponse = $this->initiatePayout("B2C");
-		$arrayResponse = json_decode($initiatePayoutResponse['response'], true);
-		$payoutId = $arrayResponse['payoutID'];
-
-		$body = array(
-			'payoutID' 				=> $payoutId,
-		    'amount' 				=> $amount,
-		    'currency' 				=> "BDT",
-		    'merchantInvoiceNumber' => $invoiceNumber,
-		    'receiverMSISDN' 		=> $receiver
-		);
-
-		$response = $this->httpRequest( 'B2C Payout', $url, $http_status, 'POST', $body, $header );
-
-		return array(
-			'status_code' => $http_status,
-			'header'      => $header,
-			'response'    => $response,
-		);
-
-		// throw  new UnexpectedValueException( 'B2C Payout is only available in Checkout integration' );
 	}
 }

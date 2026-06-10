@@ -185,7 +185,7 @@ class AdminDashboard {
 		$tableGenerator = new TablesGenerator();
 		$tableGenerator->createTransactionTable();
 		$tableGenerator->createWebhookTable();
-		// $tableGenerator->createAgreementMappingTable();
+		$tableGenerator->createAgreementMappingTable();
 		$tableGenerator->createTransferHistoryTable();
 	}
 }

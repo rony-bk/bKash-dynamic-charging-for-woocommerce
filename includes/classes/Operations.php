@@ -15,18 +15,24 @@ class Operations {
 		bool $isAgreement = false,
 		string $agreementID = ''
 	): string {
-		// agreement = 0000, paymentWithAgreementID = 0001, paymentWithoutAgreementID = 0011
+		// agreement = 1000, paymentWithAgreementID = 1001, paymentWithoutAgreementID = 1011
 		$mode = '';
 		switch ( $integration_type ) {
-			case 'checkout-url':
-				$mode = '0011';
+			case 'paymentonly':
+				$mode = '1011';
 				break;
 			case 'tokenized':
-				$mode = ! empty( $agreementID ) ? '0001' : '0000';
+				$mode = ! empty( $agreementID ) ? '1001' : '1000';
 				break;
 			case 'tokenized-both':
 				// agreement checking required
-				$mode = $isAgreement ? '0000' : '0001';
+				if ( $isAgreement ) {
+					$mode = '1000'; // create agreement
+				} elseif ( ! empty( $agreementID ) ) {
+					$mode = '1001'; // pay with existing agreement
+				} else {
+					$mode = '1011'; // no agreement → checkout-url flow
+				}
 				break;
 			default:
 				break;
