@@ -128,6 +128,7 @@ class Agreement {
 	 *
 	 * table name: wp_bkash_agreement_mapping where wp_ is the prefix set by application
 	 * Ensures only one agreement per user by updating existing or inserting new.
+	 * Also creates/updates a WC_Payment_Token for compatibility with WooCommerce checkout.
 	 *
 	 * @return Agreement|false|null
 	 */
@@ -165,8 +166,7 @@ class Agreement {
 			);
 
 			$this->errorMessage = $this->wpdb->last_error;
-
-			return $updated !== false ? $this : null;
+			$save_result = $updated !== false ? $this : null;
 		} else {
 			// Insert new agreement
 			$insert = $this->wpdb->insert(
@@ -180,8 +180,65 @@ class Agreement {
 			);
 
 			$this->errorMessage = $this->wpdb->last_error;
+			$save_result = $insert > 0 ? $this : null;
+		}
 
-			return $insert > 0 ? $this : null;
+		// Also sync to WC_Payment_Token for checkout compatibility
+		if ( $save_result && class_exists( 'WC_Payment_Tokens' ) ) {
+			$this->syncToWcPaymentToken();
+		}
+
+		return $save_result;
+	}
+
+	/**
+	 * Sync agreement to WC_Payment_Token record for checkout display.
+	 */
+	private function syncToWcPaymentToken(): void {
+		if ( empty( $this->agreementID ) || empty( $this->userID ) || ! class_exists( '\WC_Payment_Token' ) ) {
+			return;
+		}
+
+		try {
+			// Check if token already exists for this agreement
+			$existing_tokens = \WC_Payment_Tokens::get_tokens( array(
+				'gateway_id' => BKASH_DC_PLUGIN_SLUG,
+				'user_id'    => $this->userID,
+			) );
+
+			$token_exists = false;
+			if ( is_array( $existing_tokens ) ) {
+				foreach ( $existing_tokens as $t ) {
+					if ( method_exists( $t, 'get_token' ) && $t->get_token() === $this->agreementID ) {
+						$token_exists = true;
+						// Update existing token meta
+						if ( method_exists( $t, 'update_meta_data' ) ) {
+							$t->update_meta_data( 'phone', $this->mobileNo );
+							if ( method_exists( $t, 'save' ) ) {
+								$t->save();
+							}
+						}
+						break;
+					}
+				}
+			}
+
+			// Create new token if it doesn't exist
+			if ( ! $token_exists ) {
+				$token = new \WC_Payment_Token();
+				$token->set_token( $this->agreementID );
+				$token->set_gateway_id( BKASH_DC_PLUGIN_SLUG );
+				$token->set_user_id( (int) $this->userID );
+				$token->set_type( 'bKash' );
+				if ( method_exists( $token, 'add_meta_data' ) ) {
+					$token->add_meta_data( 'phone', $this->mobileNo );
+				}
+				if ( method_exists( $token, 'save' ) ) {
+					$token->save();
+				}
+			}
+		} catch ( \Throwable $e ) {
+			// Silent fail - token sync is a nice-to-have, not critical for operation
 		}
 	}
 
@@ -197,7 +254,7 @@ class Agreement {
 			return;
 		}
 		try {
-			$tokens = \WC_Payment_Tokens::get_tokens( array( 'gateway_id' => BKASH_FW_PLUGIN_SLUG ) );
+			$tokens = \WC_Payment_Tokens::get_tokens( array( 'gateway_id' => BKASH_DC_PLUGIN_SLUG ) );
 			foreach ( $tokens as $token ) {
 				if ( method_exists( $token, 'get_token' ) && $token->get_token() === $agreementID ) {
 					$token->delete();
@@ -213,6 +270,26 @@ class Agreement {
 
 		$this->errorMessage = $this->wpdb->last_error; // set if any error or null
 
+		// Sync updated phone to WC_Payment_Token if phone was updated
+		if ( $updated > 0 && ! empty( $data['phone'] ) && ! empty( $data['agreement_token'] ) && class_exists( 'WC_Payment_Tokens' ) ) {
+			try {
+				$tokens = \WC_Payment_Tokens::get_tokens( array( 'gateway_id' => BKASH_DC_PLUGIN_SLUG ) );
+				foreach ( $tokens as $token ) {
+					if ( method_exists( $token, 'get_token' ) && $token->get_token() === $data['agreement_token'] ) {
+						if ( method_exists( $token, 'update_meta_data' ) ) {
+							$token->update_meta_data( 'phone', $data['phone'] );
+							if ( method_exists( $token, 'save' ) ) {
+								$token->save();
+							}
+						}
+						break;
+					}
+				}
+			} catch ( \Throwable $e ) {
+				// Silent fail - metadata sync is non-critical
+			}
+		}
+
 		return $updated > 0;
 	}
 
@@ -220,6 +297,10 @@ class Agreement {
 		$updated = 0;
 		if ( ! empty( $agreementID ) ) {
 			$updated = $this->wpdb->delete( $this->tableName, array( 'agreement_token' => $agreementID ) );
+			// Also delete from WC_Payment_Tokens for consistency
+			if ( $updated > 0 ) {
+				$this->deleteWcTokenByToken( $agreementID );
+			}
 		}
 		if ( ! empty( $id ) ) {
 			$updated = $this->wpdb->delete( $this->tableName, array( 'ID' => $id ) );
@@ -274,7 +355,7 @@ class Agreement {
 		// If not found in legacy table, try WC_Payment_Tokens for the user
 		if ( ! empty( $user_id ) && class_exists( 'WC_Payment_Tokens' ) ) {
 			try {
-				$tokens = \WC_Payment_Tokens::get_customer_tokens( (int) $user_id, BKASH_FW_PLUGIN_SLUG );
+				$tokens = \WC_Payment_Tokens::get_customer_tokens( (int) $user_id, BKASH_DC_PLUGIN_SLUG );
 				if ( is_array( $tokens ) && ! empty( $tokens ) ) {
 					// take the most recent token
 					$token = reset( $tokens );
@@ -294,17 +375,55 @@ class Agreement {
 	}
 
 	final public function getAgreements( $user_id ) {
-		$tableName = Utils::safeSqlString( $this->tableName );
-		$sqlQuery  = "SELECT * FROM $tableName WHERE `user_id` = %s ORDER BY ID DESC";
-		if ( ! is_null( $this->wpdb ) ) {
-			return $this->wpdb->get_results(
+		$agreements = array();
+		$tableName  = Utils::safeSqlString( $this->tableName );
+		$sqlQuery   = "SELECT * FROM $tableName WHERE `user_id` = %d ORDER BY ID DESC";
+
+		if ( ! empty( $user_id ) && ! is_null( $this->wpdb ) ) {
+			$agreements = $this->wpdb->get_results(
 				$this->wpdb->prepare(
 					$sqlQuery,
-					$user_id
-				)
-			);
+					(int) $user_id
+					)
+				);
 		}
 
-		return null;
+		if ( ! empty( $agreements ) ) {
+			return $agreements;
+		}
+
+		// Try legacy WC payment tokens if the DB table does not contain any agreements.
+		if ( ! empty( $user_id ) && class_exists( 'WC_Payment_Tokens' ) ) {
+			try {
+				if ( method_exists( '\WC_Payment_Tokens', 'get_tokens' ) ) {
+					$tokens = \WC_Payment_Tokens::get_tokens(
+						array(
+							'gateway_id' => BKASH_DC_PLUGIN_SLUG,
+							'user_id'    => (int) $user_id,
+						)
+					);
+				} elseif ( method_exists( '\WC_Payment_Tokens', 'get_customer_tokens' ) ) {
+					$tokens = \WC_Payment_Tokens::get_customer_tokens( (int) $user_id, BKASH_DC_PLUGIN_SLUG );
+				} else {
+					$tokens = array();
+				}
+
+				if ( is_array( $tokens ) && ! empty( $tokens ) ) {
+					foreach ( $tokens as $token ) {
+						if ( is_object( $token ) && method_exists( $token, 'get_token' ) ) {
+							$agreements[] = (object) array(
+								'agreement_token' => $token->get_token(),
+								'phone'           => $token->get_meta( 'phone' ),
+								'ID'              => $token->get_id(),
+							);
+						}
+					}
+				}
+			} catch ( \Throwable $e ) {
+				// ignore token read errors
+			}
+		}
+
+		return $agreements;
 	}
 }

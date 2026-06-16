@@ -12,7 +12,7 @@
 
 namespace bKash\PGW\DC\Admin;
 
-// use bKash\PGW\DC\Admin\Module\AgreementModule;
+use bKash\PGW\DC\Admin\Module\AgreementModule;
 use bKash\PGW\DC\Admin\Module\TransactionModule;
 use bKash\PGW\DC\Admin\Module\TransferModule;
 use bKash\PGW\DC\Admin\Module\WebhookModule;
@@ -122,13 +122,20 @@ class AdminDashboard {
 				'function'   => array( TransferModule::class, 'transferHistory' ),
 				'show'       => $is_b2c_enabled
 			),
-			// array(
-			// 	'title'      => 'Agreements',
-			// 	'menu_title' => 'Agreements',
-			// 	'route'      => '/agreements',
-			// 	'function'   => array( AgreementModule::class, 'agreementList' ),
-			// 	'show'       => strpos( $integration_type, 'tokenized' ) === 0
-			// ),
+			array(
+				'title'      => 'Agreements',
+				'menu_title' => 'Agreements',
+				'route'      => '/agreements',
+				'function'   => array( AgreementModule::class, 'agreementList' ),
+				'show'       => strpos( $integration_type, 'tokenized' ) === 0
+			),
+			array(
+				'title'      => 'Search a bKash Agreement',
+				'menu_title' => 'Agreement Search',
+				'route'      => '/agreement_search',
+				'function'   => array( AgreementModule::class, 'agreementSearch' ),
+				'show'       => strpos( $integration_type, 'tokenized' ) === 0
+			),
 			array(
 				'title'      => 'Payment Settings',
 				'menu_title' => 'Settings',

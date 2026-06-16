@@ -15,6 +15,7 @@ namespace bKash\PGW\DC;
 
 
 use bKash\PGW\DC\Models\Transaction;
+use bKash\PGW\DC\Models\Agreement;
 use Exception;
 use WC_AJAX;
 use WC_Order;
@@ -316,7 +317,64 @@ if (!class_exists('WC_Payment_Gateway')) return;
 
         if ( ! empty( $description ) ) {
             echo wp_kses_post( wpautop( wptexturize( trim( $description ) ) ) );
-        }        
+        }
+
+        if ( is_user_logged_in() ) {
+			$user_id        = get_current_user_id();
+			$agreementModel = new Agreement();
+			$agreements     = $agreementModel->getAgreements( $user_id );
+
+            // If WooCommerce payment tokens are available, merge them so tokenized agreements are shown.
+            if ( class_exists( 'WC_Payment_Tokens' ) ) {
+                try {
+                    // Prefer the public get_tokens API (newer WC); fall back to get_customer_tokens if present.
+                    if ( method_exists( '\\WC_Payment_Tokens', 'get_tokens' ) ) {
+                        $tokens = \WC_Payment_Tokens::get_tokens( array( 'gateway_id' => BKASH_DC_PLUGIN_SLUG, 'user_id' => $user_id ) );
+                    } elseif ( method_exists( '\\WC_Payment_Tokens', 'get_customer_tokens' ) ) {
+                        $tokens = \WC_Payment_Tokens::get_customer_tokens( $user_id, BKASH_DC_PLUGIN_SLUG );
+                    } else {
+                        $tokens = array();
+                    }
+
+                    if ( is_array( $tokens ) && ! empty( $tokens ) ) {
+                        $token_agreements = array();
+                        foreach ( $tokens as $t ) {
+                            if ( is_object( $t ) && method_exists( $t, 'get_token' ) ) {
+                                $token_agreements[] = (object) array(
+                                    'agreement_token' => $t->get_token(),
+                                    'phone'           => $t->get_meta( 'phone' ),
+                                    'ID'              => $t->get_id(),
+                                );
+                            }
+                        }
+                        // Prefer WC tokens; append DB agreements that are not already represented
+                        if ( empty( $agreements ) ) {
+                            $agreements = $token_agreements;
+                        } else {
+                            foreach ( $token_agreements as $ta ) {
+                                $found = false;
+                                foreach ( $agreements as $a ) {
+                                    if ( isset( $a->agreement_token ) && $a->agreement_token === $ta->agreement_token ) {
+                                        $found = true;
+                                        break;
+                                    }
+                                }
+                                if ( ! $found ) {
+                                    $agreements[] = $ta;
+                                }
+                            }
+                        }
+                    }
+                } catch ( \Throwable $e ) {
+                    // ignore token read errors, fall back to DB agreements
+                }
+            }
+
+			// This includes your custom payment fields.
+			include_once __DIR__ . '/views/payment-fields.php';
+		} elseif ( $this->integration_type === 'tokenized' ) {
+			echo "<p style='color:red'>Please login to complete the payment</p>";
+		}
     }
 
     final public function isAvailable(): bool {

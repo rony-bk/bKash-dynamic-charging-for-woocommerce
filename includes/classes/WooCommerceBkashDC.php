@@ -86,6 +86,11 @@ class WooCommerceBkashDC {
 			add_action( 'admin_notices', array( $this, 'upgradeNotice' ) );
 			AdminUtility::addFlashNotice( 'An upgraded version of WooCommerce is required' );
 		}
+
+		// Public assets and AJAX handlers for frontend actions (agreement cancel)
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueuePublicAssets' ) );
+		add_action( 'wp_ajax_bk_cancel_agreement', array( $this, 'ajax_cancel_agreement' ) );
+		add_action( 'wp_ajax_nopriv_bk_cancel_agreement', array( $this, 'ajax_cancel_agreement' ) );
 	}
 
 	/**
@@ -323,5 +328,70 @@ class WooCommerceBkashDC {
 	 */
 	final public function pluginPath(): string {
 		return untrailingslashit( BKASH_DC_BASE_PATH );
+	}
+
+	/**
+	 * Enqueue public scripts used on checkout and tokenized UI.
+	 */
+	final public function enqueuePublicAssets() {
+		if ( ! defined( 'BKASH_DC_BASE_URL' ) ) {
+			return;
+		}
+
+		$base = untrailingslashit( BKASH_DC_BASE_URL );
+		wp_register_script( 'bkash-tokenized', $base . '/assets/js/tokenized.js', array( 'jquery' ), BKASH_DC_PLUGIN_VERSION, true );
+		wp_register_script( 'bkash-checkout', $base . '/assets/js/checkout.js', array( 'jquery' ), BKASH_DC_PLUGIN_VERSION, true );
+
+		// Enqueue both since checkout may require both behaviors
+		wp_enqueue_script( 'bkash-checkout' );
+		wp_enqueue_script( 'bkash-tokenized' );
+
+		// Localize values needed by frontend scripts
+		$localized = array(
+			'cancelAgreement'         => admin_url( 'admin-ajax.php?action=bk_cancel_agreement' ),
+			'bKashScriptURL'          => '', // set by admin setting if available
+			'submit_order'            => admin_url( 'admin-ajax.php?action=ajax_order' ),
+			'review_order_payment'    => admin_url( 'admin-ajax.php?action=review_order_payment' ),
+			'wcAjaxURL'               => admin_url( 'admin-ajax.php' ),
+			'wcPaymentCancelUrl'      => admin_url( 'admin-ajax.php?action=bk_cancel' ),
+			'bKash_slug'              => BKASH_DC_PLUGIN_SLUG,
+		);
+
+		wp_localize_script( 'bkash-tokenized', 'bKash_objects', $localized );
+		wp_localize_script( 'bkash-checkout', 'bKash_objects', $localized );
+	}
+
+	/**
+	 * AJAX handler: cancel agreement for logged in users.
+	 */
+	final public function ajax_cancel_agreement() {
+		// Check nonce
+		$nonce = $_REQUEST['security'] ?? '';
+		if ( ! wp_verify_nonce( $nonce, 'bkash-ajax-nonce' ) ) {
+			wp_send_json( array( 'result' => 'failure', 'message' => 'Invalid security token' ) );
+		}
+
+		$id = isset( $_REQUEST['id'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['id'] ) ) : '';
+		if ( empty( $id ) ) {
+			wp_send_json( array( 'result' => 'failure', 'message' => 'Agreement id missing' ) );
+		}
+
+		if ( ! is_user_logged_in() ) {
+			wp_send_json( array( 'result' => 'failure', 'message' => 'Please login to cancel agreement' ) );
+		}
+
+		$user_id = get_current_user_id();
+		$agreement = new Models\Agreement();
+		$found = $agreement->getAgreement( $id );
+		if ( ! $found || (int) $found->getUserID() !== (int) $user_id ) {
+			wp_send_json( array( 'result' => 'failure', 'message' => 'Agreement not found' ) );
+		}
+
+		$deleted = $agreement->delete( $id );
+		if ( $deleted ) {
+			wp_send_json( array( 'result' => 'success', 'message' => 'Agreement removed' ) );
+		}
+
+		wp_send_json( array( 'result' => 'failure', 'message' => 'Could not remove agreement' ) );
 	}
 } // end if class

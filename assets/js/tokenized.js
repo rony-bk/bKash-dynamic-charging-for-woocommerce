@@ -24,7 +24,7 @@ jQuery(
 						url: bKash_objects.cancelAgreement,
 						contentType: "application/x-www-form-urlencoded; charset=UTF-8",
 						enctype: 'multipart/form-data',
-						data: {'id': agreementID},
+						data: {'id': agreementID, 'security': $( '#bkash-ajax-nonce' ).val() },
 						success: function (result) {
 							try {
 								result = JSON.parse( result );

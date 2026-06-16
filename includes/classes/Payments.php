@@ -45,9 +45,9 @@ class Payments {
 				$isAgreement = Utils::hasGetField( 'agreement' );
 			}
 
-			$agreement_id = trim( html_entity_decode( Utils::safePostValue( 'agreement_id' ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+			$agreement_id = trim( html_entity_decode( Utils::safePostValue( 'dc_agreement_id' ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 			if ( ! $agreement_id ) {
-				$agreement_id = trim( html_entity_decode( Utils::safeGetValue( 'agreement_id' ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+				$agreement_id = trim( html_entity_decode( Utils::safeGetValue( 'dc_agreement_id' ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 			}
 
 			if ( $this->integration_type === 'tokenized' ) 
@@ -84,8 +84,7 @@ class Payments {
 					}
 				}
 			}
-			elseif ( $this->integration_type === 'tokenized-both' ) 
-			{
+			elseif ( $this->integration_type === 'tokenized-both' ) {
 				// ── tokenized-both (With or Without Agreement) ──
 				// Logged-in user with agreement → tokenized flow.
 				// Guest user without agreement → checkout-url flow.
@@ -115,6 +114,7 @@ class Payments {
 			}
 		}
 
+		Log::debug( 'Stored Agreement ID: ' . $storedAgreementID );
 		// Validate storedAgreementID belongs to the logged-in user
 		if ( ! empty( $storedAgreementID ) && ! empty( $merchantCustomerId ) ) {
 			$agreementCheck = new Agreement();
