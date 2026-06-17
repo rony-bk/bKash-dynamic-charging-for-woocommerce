@@ -380,7 +380,7 @@ class BkashApi {
 				'trxID' => $trx_id,
 			);
 
-			$response = $this->httpRequest( 'DC Search Transaction', $url, $http_status, 'POST', $body, $header );
+			$response = $this->httpRequest( 'Search Transaction', $url, $http_status, 'POST', $body, $header );
 		}
 
 		return array(
@@ -390,7 +390,7 @@ class BkashApi {
 		);
 	}
 
-	final public function refund( $amount, $paymentID, $trxID, $SKU, $reason ): array {
+	final public function refund( $amount, $paymentID, $trxID, $SKU, $reason, $agreementID = '' ): array {
 		$url = $this->constructed_url . 'payment/refund';
 
 		$body = array(
@@ -401,7 +401,11 @@ class BkashApi {
 			'reason'    => $reason,
 		);
 
-		$response = $this->httpRequest( 'Refund', $url, $http_status, 'POST', $body, $header );
+		if ( ! empty( $agreementID ) ) {
+			$body['agreementId'] = $agreementID;
+		}
+
+		$response = $this->httpRequest( 'Refund Transaction', $url, $http_status, 'POST', $body, $header );
 
 		return array(
 			'status_code' => $http_status,
@@ -410,13 +414,17 @@ class BkashApi {
 		);
 	}
 
-	final public function refundStatus( $paymentID, $trxID ): array {
+	final public function refundStatus( $paymentID, $trxID, $agreementID = '' ): array {
 		$url = $this->constructed_url . 'query/refund';
 
 		$body = array(
 			'paymentId' => $paymentID,
 			'trxID'     => $trxID,
 		);
+
+		if ( ! empty( $agreementID ) ) {
+			$body['agreementId'] = $agreementID;
+		}
 
 		$response = $this->httpRequest( 'Query Refund', $url, $http_status, 'POST', $body, $header );
 

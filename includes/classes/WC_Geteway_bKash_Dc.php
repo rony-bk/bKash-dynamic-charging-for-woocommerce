@@ -853,16 +853,26 @@ if (!class_exists('WC_Payment_Gateway')) return;
         $transaction = $trxObject->getTransaction( '', $id );
 
         if ( $transaction ) {
-            if ( empty( $transaction->getRefundID() ) ) {
-                $refundAmount = $amount ?? $transaction->getAmount();
+            $refundAmount  = $amount !== null ? floatval( $amount ) : floatval( $transaction->getAmount() );
+            $totalAmount   = floatval( $transaction->getAmount() );
+            $refundedSoFar = floatval( $transaction->getRefundAmount() ?? 0 );
 
-                $bkashApi = new BkashApi();
+            if ( $refundAmount <= 0 ) {
+                $trx = 'Refund amount must be greater than zero.';
+            } elseif ( $refundedSoFar >= $totalAmount ) {
+                $trx = 'This transaction has already been fully refunded.';
+            } elseif ( $refundedSoFar + $refundAmount > $totalAmount ) {
+                $trx = 'Refund amount exceeds the original transaction amount.';
+            } else {
+                $agreement_id = $order->get_meta( '_bkash_agreement_id', true );
+                $bkashApi     = new BkashApi();
                 $call = $bkashApi->refund(
                     $refundAmount,
                     $transaction->getPaymentID(),
                     $transaction->getTrxID(),
                     $transaction->getOrderID(),
-                    $reason ?? 'Refund Purpose'
+                    $reason ?? 'Refund Purpose',
+                    $agreement_id ?? ''
                 );
                 if ( isset( $call['status_code'] ) && $call['status_code'] === 200 ) {
 
@@ -882,7 +892,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
 
                             wc_create_refund(
                                 array(
-                                    'amount'         => $amount,
+                                    'amount'         => $refundAmount,
                                     'reason'         => $reason,
                                     'order_id_wcdc'  => $order_id,
                                     'refund_payment' => false,
@@ -897,10 +907,16 @@ if (!class_exists('WC_Payment_Gateway')) return;
                                 )
                             );
 
+                            $currentRefundAmount = isset( $trx['amount'] ) ? floatval( $trx['amount'] ) : $refundAmount;
+                            $newRefundTotal = $refundedSoFar + $currentRefundAmount;
+                            if ( $newRefundTotal > $totalAmount ) {
+                                $newRefundTotal = $totalAmount;
+                            }
+
                             $transaction->update(
                                 array(
                                     'refund_id'     => $trx['refundTrxId'],
-                                    'refund_amount' => $trx['amount'] ?? 0,
+                                    'refund_amount' => $newRefundTotal,
                                 ),
                                 array( 'invoice_id' => $transaction->getInvoiceID() )
                             );
@@ -919,8 +935,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
                 } else {
                     $trx = 'Cannot refund the transaction using bKash server right now, try again';
                 }
-            } else {
-                $trx = 'This transaction already has been refunded, try again';
             }
         } else {
             $trx = 'Cannot find the transaction to refund in your database, try again';
@@ -952,12 +966,13 @@ if (!class_exists('WC_Payment_Gateway')) return;
         $transaction = $trxObject->getTransaction( '', $id );
         if ( $transaction ) {
             if ( ! empty( $transaction->getRefundID() ) ) {
+                $agreement_id = $order->get_meta( '_bkash_agreement_id', true );
                 $comm = new BkashApi();
                 $call = $comm->refundStatus(
                     $transaction->getPaymentID(),
-                    $transaction->getTrxID()
+                    $transaction->getTrxID(),
+                    $agreement_id ?? ''
                 );
-    
                 if ( isset( $call['status_code'] ) && $call['status_code'] === 200 ) {
                     return isset( $call['response'] ) && is_string( $call['response'] )
                         ? json_decode( $call['response'], true ) : array();
