@@ -156,7 +156,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
                 )
             );
         }
-        // add_action( 'wp_enqueue_scripts', array( $this, 'paymentScripts' ) );
+        add_action( 'wp_enqueue_scripts', array( $this, 'paymentScripts' ) );
 
         // Customer Emails.
         // add_action( 'woocommerce_email_before_order_table', array( $this, 'emailInstructions' ), 10, 3 );
@@ -178,7 +178,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
         add_action( 'woocommerce_api_' . $this->EXECUTE_URL, array( $this, 'createPaymentCallbackProcess' ) );
         add_action( 'woocommerce_api_' . $this->PAYMENT_CANCEL_URL, array( $this, 'cancelPaymentProcess' ) );
         add_action( 'woocommerce_api_' . $this->AGREEMENT_CALLBACK_URL, array( $this, 'createAgreementCallbackProcess' ) );
-        // add_action( 'woocommerce_api_' . $this->CANCEL_AGREEMENT_URL, array( $this, 'cancelAgreementApi' ) );
+        add_action( 'woocommerce_api_' . $this->CANCEL_AGREEMENT_URL, array( $this, 'cancelAgreementApi' ) );
         add_action( 'woocommerce_api_' . $this->REVIEW_ORDER_URL, array( $this, 'processReviewOrderPayment' ) );
 
         add_action( 'woocommerce_api_' . $this->WEBHOOK_URL, array( $this, 'webhook' ) );
@@ -392,8 +392,41 @@ if (!class_exists('WC_Payment_Gateway')) return;
     /*
      * Custom CSS and JS, in most cases required only when you decided to go with a custom credit card form
      */
-    public function payment_scripts() {
+    public function paymentScripts() {
+        if ( is_checkout() ) {
+            // Enqueue main checkout script
+//             wp_enqueue_script(
+//                 'bkash-dc-checkout',
+//                 plugins_url( '../../assets/js/checkout.js', __FILE__ ),
+//                 array( 'jquery' ),
+//                 BKASH_DC_PLUGIN_VERSION,
+//                 true
+//             );
+            
+            // Enqueue tokenized script
+            wp_enqueue_script(
+                'bkash-dc-tokenized',
+                plugins_url( '../../assets/js/tokenized.js', __FILE__ ),
+                array( 'jquery' ),
+                BKASH_DC_PLUGIN_VERSION,
+                true
+            );
 
+            // // Localize all necessary variables for both checkout and tokenized scripts
+            wp_localize_script(
+                'bkash-dc-checkout',
+                'bKash_objects',
+                array(
+                    'bKash_slug'              => $this->id,
+                    'submit_order'            => add_query_arg( 'orderId', get_current_user_id(), get_site_url() . BKASH_DC_WC_API . $this->REVIEW_ORDER_URL ),
+                    'review_order_payment'    => add_query_arg( 'orderId', get_current_user_id(), get_site_url() . BKASH_DC_WC_API . $this->REVIEW_ORDER_URL ),
+                    'bKashScriptURL'          => 'https://checkout.bkash.com/bKash/checkout.js',
+                    'wcAjaxURL'               => admin_url( 'admin-ajax.php' ),
+                    'wcPaymentCancelUrl'      => add_query_arg( 'orderId', get_current_user_id(), get_site_url() . BKASH_DC_WC_API . $this->PAYMENT_CANCEL_URL ),
+                    'cancelAgreement'         => add_query_arg( 'orderId', get_current_user_id(), get_site_url() . BKASH_DC_WC_API . $this->CANCEL_AGREEMENT_URL ),
+                )
+            );
+        }
     }
 
     /*
@@ -588,6 +621,43 @@ if (!class_exists('WC_Payment_Gateway')) return;
         }
         die();
     }
+
+    /**
+	 * Agreement Cancellation API - handles removal of saved agreements on checkout
+	 */
+	final public function cancelAgreementApi() {
+		check_ajax_referer( 'bkash-ajax-nonce' );
+		$agreement_id = Utils::safePostValue( 'id' );
+
+		if ( empty( $agreement_id ) ) {
+			wp_send_json( array(
+				'result'  => 'error',
+				'message' => 'Agreement ID is required',
+			) );
+		}
+
+		$api       = new BkashApi();
+		$agreement = $api->agreementCancel( $agreement_id );
+
+		if ( isset( $agreement['status_code'] ) && $agreement['status_code'] === 200 ) {
+			if ( isset( $agreement['response'] ) && is_string( $agreement['response'] ) ) {
+				$response = json_decode( $agreement['response'], true );
+				if ( isset( $response['agreementStatus'] ) && $response['agreementStatus'] === 'Cancelled' ) {
+					$agreementObj = new Agreement();
+					$agreementObj->delete( $agreement_id );
+					wp_send_json( array(
+						'result'  => 'success',
+						'message' => 'Agreement cancelled successfully',
+					) );
+				}
+			}
+		}
+
+		wp_send_json( array(
+			'result'  => 'error',
+			'message' => 'Failed to cancel agreement',
+		) );
+	}
 
     /**
 	 * Agreement Callback Handler

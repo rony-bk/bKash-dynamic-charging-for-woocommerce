@@ -39,7 +39,7 @@
 							}
 						}
 
-						if (bKash !== undefined) {
+						if (typeof bKash !== 'undefined') {
 							let button = document.getElementById( "bKash_button" );
 							bKash.reconfigure(
 								{
