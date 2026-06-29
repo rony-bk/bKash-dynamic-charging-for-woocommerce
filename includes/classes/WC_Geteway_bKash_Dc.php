@@ -1,7 +1,7 @@
 <?php 
 
 /**
- * Payment Gateway bKash
+ * bKash WooCommerce Payment Gateway for Dynamic Charging Product.
  *
  * @category    Payment
  * @package     woo-bkash-dynamic-charging
@@ -24,13 +24,13 @@ use WP_Error;
 
 
 /**
- * WooCommerce bKash Payment Gateway for Dynamic Charging Product.
+ * bKash WooCommerce Payment Gateway for Dynamic Charging Product.
  *
  * @class   WC_Geteway_bKash_Dc
  * @extends WC_Payment_Gateway
  * @version 1.0.0
  * @package bKash\PGW
- * @author  Md. Shahnawaz Ahmed
+ * @author  Muhamamad Abid Hasan Turzo
  */
 
 if (!class_exists('WC_Payment_Gateway')) return;
@@ -160,17 +160,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
 
         // Customer Emails.
         // add_action( 'woocommerce_email_before_order_table', array( $this, 'emailInstructions' ), 10, 3 );
-
-        add_action(
-            'woocommerce_order_status_completed',
-            array(
-                __CLASS__,
-                'captureTransactionFromStatus',
-            ),
-            10,
-            2
-        );
-        add_action( 'woocommerce_order_status_cancelled', array( __CLASS__, 'voidTransactionOnCanceled' ), 10, 2 );
 
         add_action( 'woocommerce_api_' . $this->CALLBACK_URL, array( $this, 'createPaymentCallbackProcess' ) );
         add_action( 'woocommerce_api_' . $this->SUCCESS_CALLBACK_URL, array( $this, 'paymentSuccess' ) );
@@ -456,42 +445,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
         }
     }
 
-    final public function capture_charge( float $amount, WC_Order $order ): WP_Error {
-        return new WP_Error(
-            'capture-error',
-            sprintf(
-                'There was an error capturing amount of %s the charge for order: %s.',
-                $amount,
-                $order->get_id()
-            )
-        );
-    }
-
-    
-    final public function void_charge( WC_Order $order ) {
-        $id = $order->get_transaction_id();
-        try {
-            $response = $this->gateway->transaction()->void( $id );
-            if ( $response->success ) {
-                $this->save_order_meta( $response->transaction, $order );
-                $order->update_status( 'cancelled' );
-                $order->add_order_note( sprintf( 'Transaction %1$s has been voided in bKash.', $id ) );
-
-                return true;
-            }
-
-            return new WP_Error(
-                'capture-error',
-                sprintf( 'There was an error voiding the transaction. Reason: %1$s', wp_json_encode( $response ) )
-            );
-        } catch ( Exception $e ) {
-            return new WP_Error(
-                'capture-error',
-                sprintf( 'There was an error voiding the transaction. Reason: %1$s', wp_json_encode( $e ) )
-            );
-        }
-    }
-
     final public function processReviewOrderPayment() {
         $order_id = Sanitizer::safePostValue( 'order_id' );
         if ( ! $order_id ) {
@@ -751,80 +704,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
 		die();
 	}
 
-    public static function voidTransactionOnCanceled( $order_id, $order ) {
-        $trx            = '';
-        $orderDetails   = $order;
-        $trxId          = $orderDetails->get_transaction_id();
-        $payment_method = $orderDetails->get_payment_method();
-
-        if ( $payment_method === BKASH_DC_PLUGIN_SLUG ) {
-            $trxObj      = new Transaction();
-            $transaction = $trxObj->getTransaction( '', $trxId );
-            if ( $transaction ) {
-                if ( $transaction->getStatus() === 'Authorized' ) {
-                    $comm      = new BkashApi();
-                    $void_call = $comm->voidPayment( $transaction->getPaymentID() );
-
-                    if ( isset( $void_call['status_code'] ) && $void_call['status_code'] === 200 ) {
-                        $voided = array();
-                        if ( isset( $void_call['response'] ) && is_string( $void_call['response'] ) ) {
-                            $voided = json_decode( $void_call['response'], true );
-                        }
-
-                        if ( $voided ) {
-
-                            // If any error for tokenized
-                            if ( isset( $voided['statusMessage'] ) && $voided['statusMessage'] !== 'Successful' ) {
-                                $trx = $voided['statusMessage'];
-                            } elseif ( isset( $voided['errorCode'] ) ) { // If any error for checkout
-                                $trx = $voided['errorMessage'] ?? '';
-                            } elseif ( isset( $voided['transactionStatus'] ) && $voided['transactionStatus'] === BKASH_DC_CANCELLED_STATUS
-                            ) {
-                                $trx = $voided;
-
-                                $updated = $trxObj->update(
-                                    array( 'status' => BKASH_DC_CANCELLED_STATUS ),
-                                    array( 'trx_id' => $transaction->getTrxID() )
-                                );
-                                if ( ! $updated ) {
-                                    // on update error
-                                    $orderDetails->add_order_note(
-                                        'bKash PGW: Status update failed in DB, ' . $trxObj->errorMessage
-                                    );
-                                }
-
-                                $orderDetails->add_order_note(
-                                    sprintf(
-                                        'bKash PGW: Payment was updated as Void of amount %s - Payment ID: %s',
-                                        $transaction->getAmount(),
-                                        $voided['trxID']
-                                    )
-                                );
-                            } else {
-                                $trx = 'Transfer is not possible right now. try again';
-                            }
-                        } else {
-                            $trx = 'Cannot find the transaction in your database, try again';
-                        }
-                    } else {
-                        $trx = 'Cannot void using bKash server right now, try again';
-                    }
-                } else {
-                    $trx = 'Transaction is not in authorized state, thus ignore, try again';
-                }
-            }
-        }
-
-        if ( isset( $trx ) && ! empty( $trx ) ) {
-            if ( is_string( $trx ) ) {
-                self::addFlashNotice( 'Void Error, ' . $trx );
-            } elseif ( is_array( $trx ) ) {
-                // Void Success
-                self::addFlashNotice( 'Payment has been voided', 'success' );
-            }
-        }
-    }
-
     final public function webhook() {
         $method = strtoupper( $_SERVER['REQUEST_METHOD'] ?? 'GET' );
         if ( 'POST' !== $method ) {
@@ -1058,89 +937,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
 
         return $trx;
     }
-
-    public static function captureTransactionFromStatus( int $order_id, WC_Order $order ) {
-        $orderDetails   = $order;
-        $id             = $orderDetails->get_transaction_id();
-        $payment_method = $orderDetails->get_payment_method();
-
-        if ( $payment_method === BKASH_DC_PLUGIN_SLUG ) {
-            $trxObj      = new Transaction();
-            $transaction = $trxObj->getTransaction( '', $id );
-
-            if ( $transaction ) {
-                if ( $transaction->getStatus() === 'Authorized' ) {
-                    $comm        = new BkashApi();
-                    $captureCall = $comm->capturePayment( $transaction->getPaymentID() );
-
-                    if ( isset( $captureCall['status_code'] ) && $captureCall['status_code'] === 200 ) {
-                        $captured = array();
-                        if ( isset( $captureCall['response'] ) && is_string( $captureCall['response'] ) ) {
-                            $captured = json_decode( $captureCall['response'], true );
-                        }
-                        if ( $captured ) {
-                            // If any error for tokenized
-                            if ( isset( $captured['statusMessage'] ) && $captured['statusMessage'] !== 'Successful' ) {
-                                $trx = $captured['statusMessage'];
-                            } elseif ( isset( $captured['errorCode'] ) ) { // If any error for checkout
-                                $trx = $captured['errorMessage'] ?? '';
-                            } elseif ( isset( $captured['transactionStatus'] ) && $captured['transactionStatus'] === BKASH_DC_COMPLETED_STATUS
-                            ) {
-                                $trx = $captured;
-
-                                $updated = $trxObj->update(
-                                    array( 'status' => BKASH_DC_COMPLETED_STATUS ),
-                                    array( 'trx_id' => $transaction->getTrxID() )
-                                );
-                                if ( ! $updated ) {
-                                    // on update error
-                                    $orderDetails->add_order_note(
-                                        sprintf(
-                                            'bKash PGW: Status update failed in DB, %s',
-                                            $trxObj->errorMessage
-                                        )
-                                    );
-                                }
-
-                                $orderDetails->add_order_note(
-                                    sprintf(
-                                        'bKash PGW: Payment Capture of amount %s - Payment ID: %s',
-                                        $transaction->getAmount(),
-                                        $captured['trxID']
-                                    )
-                                );
-                            } else {
-                                $trx = 'Transfer is not possible right now. try again';
-                            }
-                        } else {
-                            $trx = 'Cannot parse capture response from API, try again';
-                        }
-                    } else {
-                        $trx = 'Cannot capture using bKash server right now, try again';
-                    }
-                } else {
-                    $trx = 'Transaction is not in authorized state, thus ignore, try again';
-                }
-            } else {
-                $trx = 'no transaction found with this order, try again';
-            }
-        } else {
-            // payment gateway is not bKash, try again
-            $trx = '';
-        }
-
-        if ( isset( $trx ) && ! empty( $trx ) ) {
-            if ( is_string( $trx ) ) {
-                // error occurred, show message
-                // $orderDetails->update_status('on-hold', $trx, false);
-                self::addFlashNotice( 'Capture Error, ' . $trx );
-            } elseif ( is_array( $trx ) ) {
-                // Capture Success
-                self::addFlashNotice( 'Payment has been captured', 'success' );
-            }
-        }
-    }
-
 
     public static function addFlashNotice( $notice = '', $type = 'warning', $dismissible = true ) {
         // Here we return the notices saved on our option, if there are not notices, then an empty array is returned

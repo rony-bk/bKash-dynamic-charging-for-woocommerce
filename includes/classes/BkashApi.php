@@ -236,7 +236,7 @@ class BkashApi {
 
 	final public function executePayment( string $payment_id, string $agreement_id = '' ): array {
 		$url      = $this->constructed_url . 'payment/execute';
-		$apiTitle = 'Payment Execute';
+		$apiTitle = 'DC Payment Execute';
 		$body     = array( 
 			'paymentId' => $payment_id,
 			'agreementId' => $agreement_id
@@ -257,8 +257,6 @@ class BkashApi {
 			'header'      => $header,
 			'response'    => $response,
 		);
-
-		// return $this->executeCompleteOrCaptureVoid( $payment_id, 'execute' );
 	}
 
 	final public function queryPayment( string $payment_id, string $agreement_id = '' ): array {
@@ -435,45 +433,37 @@ class BkashApi {
 		);
 	}
 
-	final public function executeCompleteOrCaptureVoid( string $payment_id, string $type ): array {
-		switch ( $type ) {
-			case 'execute':
-				$api_path     = 'payment/execute';
-				$extra_in_url = '';
-				break;
-			case 'capture':
-				$api_path     = 'payment/confirm';
-				$extra_in_url = '';
-				break;
-			case 'void':
-				$api_path     = 'payment/confirm';
-				$extra_in_url = '';
-				break;
-			default:
-				$api_path     = '';
-				$extra_in_url = '';
-		}
+	final public function capturePayment( string $payment_id, string $mode = '0011', ?string $agreement_id = '' ): array {
+		$body = array( 
+			'paymentId' => $payment_id,
+			'confirmationType' => 'capture'
+		);
 
-		
-		$url      = $this->constructed_url . $api_path . $extra_in_url;
-		$apiTitle = 'DC ' . ucwords( $type ) . ' Payment';
-		if($type == 'capture' || $type == 'void') {
-			$body     = array( 
-				'paymentId' => $payment_id,
-				'confirmationType' => $type
-			);
+		if ( $mode === '1001' ) {
+			$url      = $this->constructed_url . 'payment/confirm/';
+			$apiTitle = 'DC Capture Payment With Agreement';
+			if ( ! empty( $agreement_id ) ) {
+				$body['agreementId'] = $agreement_id;
+			}
+		} elseif ( $mode === '1011' ) {
+			$url      = $this->constructed_url . 'payment/confirm/';
+			$apiTitle = 'DC Capture Payment';
 		} else {
-			$body     = array( 'paymentId' => $payment_id );
+			return array(
+				'status_code' => -1,
+				'header'      => array(),
+				'response'    => 'Invalid mode for capture payment',
+			);
 		}
 
-		$response = $this->httpRequest($apiTitle,$url,$http_status,'POST',$body,$header);
+		$response = $this->httpRequest( $apiTitle, $url, $http_status, 'POST', $body, $header );
 
 		// QUERY PAYMENT IN CASE OF ANY NETWORK OR NO RESPONSE OR TIMED OUT ISSUE
 		$decoded_response = isset( $response['response'] ) && is_string( $response['response'] ) ?
 			json_decode( $response['response'], true ) : array();
 
 		if ( $http_status !== 200 || isset( $decoded_response['message'] ) ) {
-			return $this->queryPayment( $payment_id );
+			return $this->queryPayment( $payment_id, $agreement_id );
 		}
 
 		return array(
@@ -483,12 +473,44 @@ class BkashApi {
 		);
 	}
 
-	final public function capturePayment( string $payment_id ): array {
-		return $this->executeCompleteOrCaptureVoid( $payment_id, 'capture' );
-	}
+	final public function voidPayment( string $payment_id, string $mode = '0011', ?string $agreement_id = '' ): array {
+		$body = array( 
+			'paymentId' => $payment_id,
+			'confirmationType' => 'void' 
+		);
 
-	final public function voidPayment( string $payment_id ): array {
-		return $this->executeCompleteOrCaptureVoid( $payment_id, 'void' );
+		if ( $mode === '1001' ) {
+			$url      = $this->constructed_url . 'payment/confirm/';
+			$apiTitle = 'DC Void Payment With Agreement';
+			if ( ! empty( $agreement_id ) ) {
+				$body['agreementId'] = $agreement_id;
+			}
+		} elseif ( $mode === '1011' ) {
+			$url      = $this->constructed_url . 'payment/confirm/';
+			$apiTitle = 'DC Void Payment';
+		} else {
+			return array(
+				'status_code' => -1,
+				'header'      => array(),
+				'response'    => 'Invalid mode for void payment',
+			);
+		}
+
+		$response = $this->httpRequest( $apiTitle, $url, $http_status, 'POST', $body, $header );
+
+		// QUERY PAYMENT IN CASE OF ANY NETWORK OR NO RESPONSE OR TIMED OUT ISSUE
+		$decoded_response = isset( $response['response'] ) && is_string( $response['response'] ) ?
+			json_decode( $response['response'], true ) : array();
+
+		if ( $http_status !== 200 || isset( $decoded_response['message'] ) ) {
+			return $this->queryPayment( $payment_id, $agreement_id );
+		}
+
+		return array(
+			'status_code' => $http_status,
+			'header'      => $header,
+			'response'    => $response,
+		);
 	}
 
 	final public function checkBalances(): array {

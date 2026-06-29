@@ -55,6 +55,10 @@ require BKASH_DC_BASE_PATH . 'vendor/autoload.php';
 
 use bKash\PGW\DC\Admin\AdminDashboard;
 
+// Load admin helpers
+if ( is_admin() ) {
+	require_once BKASH_DC_BASE_PATH . 'includes/classes/Admin/OrderActions.php';
+}
 
 /**
  * Initiating tables on plugin activation

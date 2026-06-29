@@ -114,7 +114,6 @@ class Payments {
 			}
 		}
 
-		Log::debug( 'Stored Agreement ID: ' . $storedAgreementID );
 		// Validate storedAgreementID belongs to the logged-in user
 		if ( ! empty( $storedAgreementID ) && ! empty( $merchantCustomerId ) ) {
 			$agreementCheck = new Agreement();
@@ -198,7 +197,6 @@ class Payments {
 					} elseif ( isset( $response['paymentId'] ) && ! empty( $response['paymentId'] ) ) {
 						// Remove items from cart.
 						WC()->cart->empty_cart();
-						Log::debug( 'Cart emptied.' );
 
 						$updated = $trxSaved->update( array( 'payment_id' => $response['paymentId'] ) );
 						if ( $updated ) {
@@ -381,8 +379,6 @@ class Payments {
 
 								// Reduce stock levels.
 								wc_reduce_stock_levels( $order_id );
-
-								Log::debug( 'Stock reduced.' );
 
 								// Return thank you page redirect.
 								wp_safe_redirect( $orderPageURL );
