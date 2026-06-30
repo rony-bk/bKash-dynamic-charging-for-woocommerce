@@ -44,7 +44,6 @@ This plugin supports below environments of bKash payment gateway.
 ### Additional Features of different bKash payment gateway products.
 * Merchant Wallet Balance Check (In Checkout Only)
 * B2C Payout (In Checkout Only)
-* Intra Account Transfer
 * Web-hooks
 * Refund
 * Search Transaction
@@ -53,7 +52,6 @@ This plugin supports below environments of bKash payment gateway.
 * Transaction List
 * Search a transaction
 * Check Balances
-* Intra account transfer
 * Disburse Money
 * Transfer History
 * Refund

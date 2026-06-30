@@ -383,15 +383,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
      */
     public function paymentScripts() {
         if ( is_checkout() ) {
-            // Enqueue main checkout script
-//             wp_enqueue_script(
-//                 'bkash-dc-checkout',
-//                 plugins_url( '../../assets/js/checkout.js', __FILE__ ),
-//                 array( 'jquery' ),
-//                 BKASH_DC_PLUGIN_VERSION,
-//                 true
-//             );
-            
             // Enqueue tokenized script
             wp_enqueue_script(
                 'bkash-dc-tokenized',

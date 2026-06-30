@@ -14,7 +14,6 @@ namespace bKash\PGW\DC\Admin;
 
 use bKash\PGW\DC\Admin\Module\AgreementModule;
 use bKash\PGW\DC\Admin\Module\TransactionModule;
-use bKash\PGW\DC\Admin\Module\TransferModule;
 use bKash\PGW\DC\Admin\Module\WebhookModule;
 use bKash\PGW\DC\TablesGenerator;
 
@@ -93,34 +92,6 @@ class AdminDashboard {
 				'route'      => '/webhooks',
 				'function'   => array( WebhookModule::class, 'webhooks' ),
 				'show'       => $is_webhook_enabled
-			),
-			array(
-				'title'      => 'Check Balances',
-				'menu_title' => 'Check Balances',
-				'route'      => '/balances',
-				'function'   => array( TransferModule::class, 'checkBalances' ),
-				'show'       => $is_b2c_enabled
-			),
-			array(
-				'title'      => 'Intra Account Transfer',
-				'menu_title' => 'Intra Account Transfer',
-				'route'      => '/intra_account',
-				'function'   => array( TransferModule::class, 'transferBalance' ),
-				'show'       => $is_b2c_enabled
-			),
-			array(
-				'title'      => 'B2C Payout - Disbursement',
-				'menu_title' => 'Disburse Money (B2C)',
-				'route'      => '/b2c_payout',
-				'function'   => array( TransferModule::class, 'disburseMoney' ),
-				'show'       => $is_b2c_enabled
-			),
-			array(
-				'title'      => 'Transfer History',
-				'menu_title' => 'Transfer History',
-				'route'      => '/transfers',
-				'function'   => array( TransferModule::class, 'transferHistory' ),
-				'show'       => $is_b2c_enabled
 			),
 			array(
 				'title'      => 'Agreements',
