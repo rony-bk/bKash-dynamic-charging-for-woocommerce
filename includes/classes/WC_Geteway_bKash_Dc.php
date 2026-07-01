@@ -90,10 +90,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
      * @var string|null
      */
     private $integration_type;
-    /**
-     * @var string|null
-     */
-    private $enable_b2c;
 
     /**
      * Constructor for the gateway.
@@ -137,7 +133,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
         $this->username         = $this->get_option( 'username' );
         $this->password         = $this->get_option( 'password' );
         $this->debug            = $this->get_option( 'debug' );
-        $this->enable_b2c       = $this->get_option( 'enable_b2c' );
         $this->is_webhook = $this->get_option( 'webhook' );
     }
 
@@ -238,13 +233,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
                     'Log bKash PGW events inside <code>%s</code>',
                     esc_html('WooCommerce >> Status >> Logs')
                 ),
-            ),
-            'enable_b2c'         => array(
-                'title'       => 'Enable B2C API',
-                'type'        => 'checkbox',
-                'label'       => 'Enable B2C API',
-                'default'     => 'no',
-                'description' => 'Enable B2C Disbursement API',
             ),
             'webhook'            => array(
                 'title'       => 'Webhook',

@@ -120,34 +120,4 @@ class TablesGenerator {
 			add_option( 'bkash_dc_agreement_mapping_table_version', $my_products_db_version );
 		}
 	}
-
-	/**
-	 * @return void
-	 */
-	final public function createTransferHistoryTable() {
-		global $wpdb;
-		$table_name             = $wpdb->prefix . 'bkash_dc_transfers';
-		$my_products_db_version = BKASH_DC_PGW_VERSION;
-		$charset_collate        = $wpdb->get_charset_collate();
-
-		if ( $wpdb->get_var( $this->prepareQuery( $table_name ) ) !== $table_name ) {
-			$sql = "CREATE TABLE $table_name (
-                    id bigint NOT NULL AUTO_INCREMENT,
-                    `receiver` VARCHAR(20) NOT NULL,
-                    `amount` decimal(15,2) NOT NULL,
-                    `currency` VARCHAR(3) NOT NULL,
-                    `trx_id` VARCHAR(50) NOT NULL,
-                    `merchant_invoice_no` VARCHAR(80) NOT NULL,
-                    `transactionStatus` VARCHAR(30) NOT NULL,
-                    `b2cFee` VARCHAR(40) NULL,
-                    `initiationTime` timestamp NULL,
-                    `completedTime` timestamp NULL,
-                    PRIMARY KEY (id)
-            ) $charset_collate;";
-
-			require_once ABSPATH . BKASH_UPGRADE_FILE;
-			dbDelta( $sql );
-			add_option( 'bkash_dc_transfer_table_version', $my_products_db_version );
-		}
-	}
 }

@@ -24,7 +24,6 @@ class BkashApi {
 	private $intent;
 	private $sandbox;
 	private $api_version;
-	private $enable_b2c;
 	private $app_key;
 	private $app_secret;
 	private $username;
@@ -51,7 +50,6 @@ class BkashApi {
 		$this->integration_product = $this->getOptions( 'integration_type', 'paymentonly' );
 		$this->intent              = $this->getOptions( 'intent', 'sale' );
 		$this->api_version         = $this->getOptions( 'bkash_api_version', 'v1' );
-		$this->enable_b2c = $this->getOptions( 'enable_b2c' );
 		$this->sandbox    = $this->getOptions( 'sandbox', false );
 		$this->app_key    = $this->getOptions( 'app_key' );
 		$this->app_secret = $this->getOptions( 'app_secret' );
@@ -380,51 +378,6 @@ class BkashApi {
 
 			$response = $this->httpRequest( 'Search Transaction', $url, $http_status, 'POST', $body, $header );
 		}
-
-		return array(
-			'status_code' => $http_status,
-			'header'      => $header,
-			'response'    => $response,
-		);
-	}
-
-	final public function refund( $amount, $paymentID, $trxID, $SKU, $reason, $agreementID = '' ): array {
-		$url = $this->constructed_url . 'payment/refund';
-
-		$body = array(
-			'amount'    => $amount,
-			'paymentId' => $paymentID,
-			'trxID'     => $trxID,
-			'sku'       => $SKU,
-			'reason'    => $reason,
-		);
-
-		if ( ! empty( $agreementID ) ) {
-			$body['agreementId'] = $agreementID;
-		}
-
-		$response = $this->httpRequest( 'Refund Transaction', $url, $http_status, 'POST', $body, $header );
-
-		return array(
-			'status_code' => $http_status,
-			'header'      => $header,
-			'response'    => $response,
-		);
-	}
-
-	final public function refundStatus( $paymentID, $trxID, $agreementID = '' ): array {
-		$url = $this->constructed_url . 'query/refund';
-
-		$body = array(
-			'paymentId' => $paymentID,
-			'trxID'     => $trxID,
-		);
-
-		if ( ! empty( $agreementID ) ) {
-			$body['agreementId'] = $agreementID;
-		}
-
-		$response = $this->httpRequest( 'Query Refund', $url, $http_status, 'POST', $body, $header );
 
 		return array(
 			'status_code' => $http_status,

@@ -47,7 +47,7 @@ class AdminDashboard {
 	private function addMainMenu() {
 		add_menu_page(
 			'Woocommerce Payment Gateway - bKash',
-			'bKash',
+			'bKash - Dynamic Charging',
 			'manage_options',
 			BKASH_DC_ADMIN_PAGE_SLUG,
 			array( TransactionModule::class, 'transactionList' ),
@@ -60,7 +60,6 @@ class AdminDashboard {
 	 */
 	private function addSubMenus() {
 		$pid                = BKASH_DC_PLUGIN_SLUG;
-		$is_b2c_enabled     = AdminUtility::getBKashOptions( $pid, 'enable_b2c' );
 		$is_webhook_enabled = AdminUtility::getBKashOptions( $pid, 'webhook' );
 		$integration_type   = AdminUtility::getBKashOptions( $pid, 'integration_type' );
 
@@ -77,13 +76,6 @@ class AdminDashboard {
 				'menu_title' => 'Search',
 				'route'      => '/search',
 				'function'   => array( TransactionModule::class, 'transactionSearch' ),
-				'show'       => true
-			),
-			array(
-				'title'      => 'Refund a bKash Transaction',
-				'menu_title' => 'Refund',
-				'route'      => '/refund',
-				'function'   => array( TransactionModule::class, 'refundATransaction' ),
 				'show'       => true
 			),
 			array(
