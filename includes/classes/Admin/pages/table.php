@@ -3,7 +3,7 @@
  * Table
  *
  * @category    Page
- * @package     woo-bkash-dynamic-charging
+ * @package     bkash-woocommerce-dynamic-charging
  * @author      bKash Developer <developer@bkash.com>
  * @copyright   Copyright 2023 bKash Limited. All rights reserved.
  * @license     GNU General Public License version 2 or later; see LICENSE
@@ -17,7 +17,7 @@ use bKash\PGW\DC\Sanitizer;
 	<div class="wrap abs">
 		<h2>
 			<?php
-			esc_html_e( $title ?? 'List', 'woo-bkash-dynamic-charging' );
+			esc_html_e( $title ?? 'List', 'bkash-woocommerce-dynamic-charging' );
 			?>
 		</h2>
 
@@ -32,7 +32,7 @@ use bKash\PGW\DC\Sanitizer;
 							$old_input = Sanitizer::safeGetValue( $key ) ?? '';
 							?>
 							<label>
-								<input type="text" name="<?php esc_attr_e( $key, 'woo-bkash-dynamic-charging' );?>" value="<?php esc_attr_e( $old_input, 'woo-bkash-dynamic-charging' );?>" placeholder="<?php esc_attr_e( $filter, 'woo-bkash-dynamic-charging' ); ?>" autocomplete="off" />
+								<input type="text" name="<?php esc_attr_e( $key, 'bkash-woocommerce-dynamic-charging' );?>" value="<?php esc_attr_e( $old_input, 'bkash-woocommerce-dynamic-charging' );?>" placeholder="<?php esc_attr_e( $filter, 'bkash-woocommerce-dynamic-charging' ); ?>" autocomplete="off" />
 							</label>
 							<?php
 						}
@@ -40,7 +40,7 @@ use bKash\PGW\DC\Sanitizer;
 
 					$page_name = Sanitizer::safeGetValue( 'page' ) ?? '';
 					?>
-					<input type="hidden" name="page" value="<?php esc_attr_e( $page_name, 'woo-bkash-dynamic-charging' );?>" />
+					<input type="hidden" name="page" value="<?php esc_attr_e( $page_name, 'bkash-woocommerce-dynamic-charging' );?>" />
 					<button type="submit">Search</button>
 				</form>
 
@@ -105,7 +105,7 @@ use bKash\PGW\DC\Sanitizer;
 											<p>
 												<?php
 												$value = AdminUtility::keyToLabel( $item ) . ': ' . $row->{$item};
-												esc_html_e( $value, 'woo-bkash-dynamic-charging' );
+												esc_html_e( $value, 'bkash-woocommerce-dynamic-charging' );
 												?>
 											</p>
 											<?php
@@ -127,12 +127,12 @@ use bKash\PGW\DC\Sanitizer;
 										?>
 										 !important;">
 										<?php
-											esc_html_e( $row->{$column}, 'woo-bkash-dynamic-charging' );
+											esc_html_e( $row->{$column}, 'bkash-woocommerce-dynamic-charging' );
 										?>
 											</span>
 										<?php
 									} else {
-										esc_html_e( $row->{$column}, 'woo-bkash-dynamic-charging' );
+										esc_html_e( $row->{$column}, 'bkash-woocommerce-dynamic-charging' );
 									}
 									?>
 								</td>

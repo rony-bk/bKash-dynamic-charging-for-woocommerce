@@ -255,7 +255,7 @@ class Payments {
 
 		// Logger for diagnostics
 		$logger = null;
-		$log_context = array( 'source' => 'woo-bkash-dynamic-charging' );
+		$log_context = array( 'source' => 'bkash-woocommerce-dynamic-charging' );
 		if ( function_exists( 'wc_get_logger' ) ) {
 			$logger = wc_get_logger();
 			$logger->debug( 'executePayment called', array_merge( $log_context, array( 'order_id' => $order_id, 'payment_id' => $payment_id, 'invoice_id' => $invoice_id, 'orderPageURL' => $orderPageURL, 'callbackURL' => $callbackURL ) ) );

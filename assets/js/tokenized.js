@@ -4,7 +4,7 @@ jQuery(
 
 		$( 'form.woocommerce-checkout' ).on(
 			'click',
-			".cancelAgreementButton",
+			".dcCancelAgreementButton",
 			function (event) {
 				let agreement = $( this ).data( 'agreement' );
 				if (agreement) {

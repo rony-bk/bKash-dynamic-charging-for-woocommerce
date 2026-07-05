@@ -3,7 +3,7 @@
  * WooCommerce bKash PGW
  *
  * @category    Payment
- * @package     bkash-dynamic-charging
+ * @package     bkash-woocommerce-dynamic-charging
  * @author      bKash Developer <developer@bkash.com>
  * @copyright   Copyright 2023 bKash Limited. All rights reserved.
  * @license     GNU General Public License version 2 or later; see LICENSE
@@ -209,30 +209,30 @@ class WooCommerceBkashDC {
 		$lang_dir = apply_filters( 'woocommerce_' . BKASH_DC_PLUGIN_SLUG . '_languages_directory', $lang_dir );
 
 		// Traditional WordPress plugin locale filter
-		$locale = apply_filters( 'plugin_locale', get_locale(), 'woo-bkash-dynamic-charging' );
-		$moFile = sprintf( '%1$s-%2$s.mo', 'woo-bkash-dynamic-charging', $locale );
+		$locale = apply_filters( 'plugin_locale', get_locale(), 'bkash-woocommerce-dynamic-charging' );
+		$moFile = sprintf( '%1$s-%2$s.mo', 'bkash-woocommerce-dynamic-charging', $locale );
 
 		// Setup paths to current locale file
 		$moFileLocal       = $lang_dir . $moFile;
-		$moFileGlobal      = WP_LANG_DIR . '/' . 'woo-bkash-dynamic-charging' . '/' . $moFile;
-		$genericMoFileLocal  = $lang_dir . 'woo-bkash-dynamic-charging.mo';
-		$genericMoFileGlobal = WP_LANG_DIR . '/' . 'woo-bkash-dynamic-charging' . '/' . 'woo-bkash-dynamic-charging.mo';
+		$moFileGlobal      = WP_LANG_DIR . '/' . 'bkash-woocommerce-dynamic-charging' . '/' . $moFile;
+		$genericMoFileLocal  = $lang_dir . 'bkash-woocommerce-dynamic-charging.mo';
+		$genericMoFileGlobal = WP_LANG_DIR . '/' . 'bkash-woocommerce-dynamic-charging' . '/' . 'bkash-woocommerce-dynamic-charging.mo';
 
 		if ( file_exists( $moFileGlobal ) ) {
 			// Look in global /wp-content/languages/plugin-name/ folder for locale-specific file.
-			load_textdomain( 'woo-bkash-dynamic-charging', $moFileGlobal );
+			load_textdomain( 'bkash-woocommerce-dynamic-charging', $moFileGlobal );
 		} elseif ( file_exists( $moFileLocal ) ) {
 			// Look in local /wp-content/plugins/plugin-name/languages/ folder for locale-specific file.
-			load_textdomain( 'woo-bkash-dynamic-charging', $moFileLocal );
+			load_textdomain( 'bkash-woocommerce-dynamic-charging', $moFileLocal );
 		} elseif ( file_exists( $genericMoFileGlobal ) ) {
 			// Fallback to generic plugin textdomain file in global languages folder.
-			load_textdomain( 'woo-bkash-dynamic-charging', $genericMoFileGlobal );
+			load_textdomain( 'bkash-woocommerce-dynamic-charging', $genericMoFileGlobal );
 		} elseif ( file_exists( $genericMoFileLocal ) ) {
 			// Fallback to generic plugin textdomain file in plugin languages folder.
-			load_textdomain( 'woo-bkash-dynamic-charging', $genericMoFileLocal );
+			load_textdomain( 'bkash-woocommerce-dynamic-charging', $genericMoFileLocal );
 		} else {
 			// Load the default language files from the plugin languages directory.
-			load_plugin_textdomain( 'woo-bkash-dynamic-charging', false, $lang_dir );
+			load_plugin_textdomain( 'bkash-woocommerce-dynamic-charging', false, $lang_dir );
 		}
 	}
 

@@ -1,5 +1,5 @@
 {
-  "name": "bkash/woo-bkash-dynamic-charging",
+  "name": "bkash/bkash-woocommerce-dynamic-charging",
   "description": "Collect payment from bKash account holders for your online purchase.",
   "type": "library",
   "license": "GPL2",

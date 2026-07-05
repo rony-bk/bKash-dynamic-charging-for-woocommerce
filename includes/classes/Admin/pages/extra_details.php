@@ -13,12 +13,12 @@ if ( isset( $trx ) && $trx ) {
 		<tr>
 			<td>Transaction ID</td>
 			<td><?php
-				esc_html_e( $trx->getTrxID() ?? '', "woo-bkash-dynamic-charging" ); ?></td>
+				esc_html_e( $trx->getTrxID() ?? '', "bkash-woocommerce-dynamic-charging" ); ?></td>
 		</tr>
 		<tr>
 			<td>Payment Status</td>
 			<td><?php
-				esc_html_e( $trx->getStatus() ?? '', "woo-bkash-dynamic-charging" ); ?></td>
+				esc_html_e( $trx->getStatus() ?? '', "bkash-woocommerce-dynamic-charging" ); ?></td>
 		</tr>
 	</table>
 

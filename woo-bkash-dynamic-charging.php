@@ -4,25 +4,25 @@
  * Description:       A bKash Dynamic Charging payment gateway plugin for WooCommerce.
  * Version:           1.0.1
  * Author:            bKash Limited
- * Author URI:        https://github.com/prabalsslw/woo-bkash-dynamic-charging
+ * Author URI:        https://github.com/bKash-developer/bkash-woocommerce-dynamic-charging
  * Requires PHP:      8.0
  * Requires at least: 6.0
  * Tested up to:      6.9
  * WC requires at least: 8.0
  * WC tested up to:   10.7
  * Requires Plugins:  woocommerce/woocommerce.php
- * Text Domain:       woo-bkash-dynamic-charging
+ * Text Domain:       bkash-woocommerce-dynamic-charging
  * Domain Path:       languages
  * Network:           false
  * License:           GPL v2 or later
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
- * GitHub Plugin URI: https://github.com/bkash-developer
+ * GitHub Plugin URI: https://github.com/bKash-developer
  * 
  * Fired during plugin activation.
  *
  * This class defines all code necessary to run during the plugin's activation.
  *
- * @package  woo-bkash-dynamic-charging
+ * @package  bkash-woocommerce-dynamic-charging
  * @author   bKash Limited
  * @category Payment
 **/
@@ -43,7 +43,7 @@ if ( version_compare( PHP_VERSION, '8.0', '<' ) ) {
 
 define( 'BKASH_DC_BASE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BKASH_DC_BASE_URL', plugin_dir_url( __FILE__ ) );
-define( 'BKASH_DC_PLUGIN_SLUG', 'woo-bkash-dynamic-charging' );
+define( 'BKASH_DC_PLUGIN_SLUG', 'bkash-woocommerce-dynamic-charging' );
 define( 'BKASH_DC_PLUGIN_VERSION', '1.0.1' );
 define( 'BKASH_DC_PLUGIN_BASEPATH', plugin_basename( __FILE__ ) );
 

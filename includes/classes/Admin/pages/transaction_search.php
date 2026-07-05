@@ -10,14 +10,14 @@ use function bKash\PGW\DC\WooCommerceBkashDC;
 </style>
 <h1>
 <?php
-	esc_attr_e( get_admin_page_title(), 'woo-bkash-dynamic-charging' );
+	esc_attr_e( get_admin_page_title(), 'bkash-woocommerce-dynamic-charging' );
 ?>
 	</h1>
 <br>
 <form action="#" method="post">
 	<?php wp_nonce_field( 'bkash_transaction_search', 'bkash_transaction_search_nonce' ); ?>
 	<label for="trxid" class="form-label">Transaction ID</label>
-	<input name="trxid" type="text" id="trxid" placeholder="Transaction ID" class="form-text-input" autocomplete="off" value="<?php esc_attr_e( $trx_id ?? '', 'woo-bkash-dynamic-charging' ); ?>">
+	<input name="trxid" type="text" id="trxid" placeholder="Transaction ID" class="form-text-input" autocomplete="off" value="<?php esc_attr_e( $trx_id ?? '', 'bkash-woocommerce-dynamic-charging' ); ?>">
 
 	<button class="button button-primary" type="submit">Search</button>
 </form>
@@ -31,7 +31,7 @@ if ( isset( $trx ) && is_string( $trx ) ) {
 	<div id="message" class="bKash-hero-div woocommerce-message bKash-error">
 		<p>
 		<?php
-			esc_html_e( $trx ?? '', 'woo-bkash-dynamic-charging' );
+			esc_html_e( $trx ?? '', 'bkash-woocommerce-dynamic-charging' );
 		?>
 			</p>
 	</div>
@@ -44,14 +44,14 @@ if ( isset( $trx ) && is_string( $trx ) ) {
 		<p class="main">
 			<strong>Transaction ID: 
 			<?php
-				esc_html_e( $trx['trxID'] ?? '', 'woo-bkash-dynamic-charging' );
+				esc_html_e( $trx['trxID'] ?? '', 'bkash-woocommerce-dynamic-charging' );
 			?>
 				</strong>
 		</p>
 		<hr>
 		<p>Sender: <b>
 		<?php
-				esc_html_e( $trx['customerMsisdn'] ?? '', 'woo-bkash-dynamic-charging' );
+				esc_html_e( $trx['customerMsisdn'] ?? '', 'bkash-woocommerce-dynamic-charging' );
 		?>
 				</b></p>
 		<p>
@@ -60,7 +60,7 @@ if ( isset( $trx ) && is_string( $trx ) ) {
 				<?php
 				esc_html_e(
 					( $trx['amount'] ?? '' ) . ' ' . ( $trx['currency'] ?? '' ),
-					'woo-bkash-dynamic-charging'
+					'bkash-woocommerce-dynamic-charging'
 				);
 				?>
 			</b>
@@ -71,7 +71,7 @@ if ( isset( $trx ) && is_string( $trx ) ) {
 				Invoice Number:
 				<strong>
 				<?php
-					esc_html_e( $trx['merchantInvoiceNumber'] ?? '', 'woo-bkash-dynamic-charging' );
+					esc_html_e( $trx['merchantInvoiceNumber'] ?? '', 'bkash-woocommerce-dynamic-charging' );
 				?>
 					</strong>
 			</li>
@@ -79,7 +79,7 @@ if ( isset( $trx ) && is_string( $trx ) ) {
 				Transaction Type:
 				<strong>
 				<?php
-					esc_html_e( $trx['transactionType'] ?? '', 'woo-bkash-dynamic-charging' );
+					esc_html_e( $trx['transactionType'] ?? '', 'bkash-woocommerce-dynamic-charging' );
 				?>
 					</strong>
 			</li>
@@ -87,7 +87,7 @@ if ( isset( $trx ) && is_string( $trx ) ) {
 				Merchant Account:
 				<strong>
 				<?php
-					esc_html_e( $trx['organizationShortCode'] ?? '', 'woo-bkash-dynamic-charging' );
+					esc_html_e( $trx['organizationShortCode'] ?? '', 'bkash-woocommerce-dynamic-charging' );
 				?>
 					</strong>
 			</li>
@@ -95,7 +95,7 @@ if ( isset( $trx ) && is_string( $trx ) ) {
 				Service Fee:
 				<strong>
 				<?php
-					esc_html_e( $trx['serviceFee'] ?? '', 'woo-bkash-dynamic-charging' );
+					esc_html_e( $trx['serviceFee'] ?? '', 'bkash-woocommerce-dynamic-charging' );
 				?>
 					</strong>
 			</li>
@@ -103,7 +103,7 @@ if ( isset( $trx ) && is_string( $trx ) ) {
 				Initiated At:
 				<strong>
 				<?php
-					esc_html_e( $trx['initiationTime'] ?? '', 'woo-bkash-dynamic-charging' );
+					esc_html_e( $trx['initiationTime'] ?? '', 'bkash-woocommerce-dynamic-charging' );
 				?>
 					</strong>
 			</li>
@@ -111,7 +111,7 @@ if ( isset( $trx ) && is_string( $trx ) ) {
 				Completed At:
 				<strong>
 				<?php
-					esc_html_e( $trx['completedTime'] ?? '', 'woo-bkash-dynamic-charging' );
+					esc_html_e( $trx['completedTime'] ?? '', 'bkash-woocommerce-dynamic-charging' );
 				?>
 					</strong>
 			</li>
@@ -122,12 +122,12 @@ if ( isset( $trx ) && is_string( $trx ) ) {
 			?>
 			<button class="button button-small 
 			<?php
-			esc_attr_e( $btn_class, 'woo-bkash-dynamic-charging' );
+			esc_attr_e( $btn_class, 'bkash-woocommerce-dynamic-charging' );
 			?>
 			">
 				Transaction Status -
 				<?php
-				esc_html_e( $trx['transactionStatus'] ?? '', 'woo-bkash-dynamic-charging' );
+				esc_html_e( $trx['transactionStatus'] ?? '', 'bkash-woocommerce-dynamic-charging' );
 				?>
 			</button>
 		</p>

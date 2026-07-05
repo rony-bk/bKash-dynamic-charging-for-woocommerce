@@ -1,6 +1,6 @@
 <?php return array(
     'root' => array(
-        'name' => 'bkash/woo-bkash-dynamic-charging',
+        'name' => 'bkash/bkash-woocommerce-dynamic-charging',
         'pretty_version' => '1.0.0+no-version-set',
         'version' => '1.0.0.0',
         'reference' => NULL,
@@ -10,7 +10,7 @@
         'dev' => true,
     ),
     'versions' => array(
-        'bkash/woo-bkash-dynamic-charging' => array(
+        'bkash/bkash-woocommerce-dynamic-charging' => array(
             'pretty_version' => '1.0.0+no-version-set',
             'version' => '1.0.0.0',
             'reference' => NULL,

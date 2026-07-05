@@ -4,7 +4,7 @@
  * bKash WooCommerce Payment Gateway for Dynamic Charging Product.
  *
  * @category    Payment
- * @package     woo-bkash-dynamic-charging
+ * @package     bkash-woocommerce-dynamic-charging
  * @author      bKash Developer <developer@bkash.com>
  * @copyright   Copyright 2023 bKash Limited. All rights reserved.
  * @license     GNU General Public License version 2 or later; see LICENSE
