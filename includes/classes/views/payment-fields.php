@@ -29,5 +29,5 @@ if ( ! $isLoggedIn ) {
 }
 ?>
 
-<input type="hidden" name="bkash-ajax-nonce" id="bkash-ajax-nonce" value="<?php
-echo wp_kses_post( wp_create_nonce( 'bkash-ajax-nonce' ) ); ?>"/>
+<input type="hidden" name="bkash-dc-ajax-nonce" id="bkash-dc-ajax-nonce" value="<?php
+echo wp_kses_post( wp_create_nonce( 'bkash-dc-ajax-nonce' ) ); ?>"/>

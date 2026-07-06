@@ -45,7 +45,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
     private $EXECUTE_URL            = 'bkdc_execute';
     private $PAYMENT_CANCEL_URL     = 'bkdc_cancel';
     private $AGREEMENT_CALLBACK_URL = 'bkdc_agreement_callback';
-    private $CANCEL_AGREEMENT_URL   = 'bkdc_cancel_agreement';
+    private $CANCEL_DC_AGREEMENT_URL   = 'bkdc_cancel_agreement';
     private $REVIEW_ORDER_URL       = 'bkdc_review_order';
     private $WEBHOOK_URL            = 'bkashdc_webhook';
 
@@ -162,7 +162,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
         add_action( 'woocommerce_api_' . $this->EXECUTE_URL, array( $this, 'createPaymentCallbackProcess' ) );
         add_action( 'woocommerce_api_' . $this->PAYMENT_CANCEL_URL, array( $this, 'cancelPaymentProcess' ) );
         add_action( 'woocommerce_api_' . $this->AGREEMENT_CALLBACK_URL, array( $this, 'createAgreementCallbackProcess' ) );
-        add_action( 'woocommerce_api_' . $this->CANCEL_AGREEMENT_URL, array( $this, 'cancelAgreementApi' ) );
+        add_action( 'woocommerce_api_' . $this->CANCEL_DC_AGREEMENT_URL, array( $this, 'cancelAgreementApi' ) );
         add_action( 'woocommerce_api_' . $this->REVIEW_ORDER_URL, array( $this, 'processReviewOrderPayment' ) );
 
         add_action( 'woocommerce_api_' . $this->WEBHOOK_URL, array( $this, 'webhook' ) );
@@ -380,9 +380,9 @@ if (!class_exists('WC_Payment_Gateway')) return;
                 true
             );
 
-            // // Localize all necessary variables for both checkout and tokenized scripts
+            // Localize variables needed by tokenized.js
             wp_localize_script(
-                'bkash-dc-checkout',
+                'bkash-dc-tokenized',
                 'bKash_objects',
                 array(
                     'bKash_slug'              => $this->id,
@@ -391,7 +391,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
                     'bKashScriptURL'          => 'https://checkout.bkash.com/bKash/checkout.js',
                     'wcAjaxURL'               => admin_url( 'admin-ajax.php' ),
                     'wcPaymentCancelUrl'      => add_query_arg( 'orderId', get_current_user_id(), get_site_url() . BKASH_DC_WC_API . $this->PAYMENT_CANCEL_URL ),
-                    'cancelAgreement'         => add_query_arg( 'orderId', get_current_user_id(), get_site_url() . BKASH_DC_WC_API . $this->CANCEL_AGREEMENT_URL ),
+                    'cancelAgreement'         => add_query_arg( 'orderId', get_current_user_id(), get_site_url() . BKASH_DC_WC_API . $this->CANCEL_DC_AGREEMENT_URL ),
                 )
             );
         }
@@ -459,10 +459,10 @@ if (!class_exists('WC_Payment_Gateway')) return;
 
 
     /**
- * Check if SSL is enabled and notify the user.
- *
- * @access public
- */
+     * Check if SSL is enabled and notify the user.
+     *
+     * @access public
+     */
     final public function checks() {
         if ( $this->enabled === 'no' ) {
             return;
@@ -557,10 +557,31 @@ if (!class_exists('WC_Payment_Gateway')) return;
     /**
 	 * Agreement Cancellation API - handles removal of saved agreements on checkout
 	 */
-	final public function cancelAgreementApi() {
-		check_ajax_referer( 'bkash-ajax-nonce' );
-		$agreement_id = Utils::safePostValue( 'id' );
+    final public function cancelAgreementApi() {
+        // Validate nonce sent from the checkout form (field id: bkash-dc-ajax-nonce)
+        $security = Utils::safePostValue( 'security' );
+        
+        if ( empty( $security ) ) {
+            $security = Utils::safeGetValue( 'security' );
+        }
+        
+        if ( empty( $security ) ) {
+            wp_send_json( array(
+                'result'  => 'error',
+                'message' => 'Invalid nonce - security parameter is missing',
+            ) );
+        }
+        
+        $nonce_verified = wp_verify_nonce( $security, 'bkash-dc-ajax-nonce' );
+        
+        if ( ! $nonce_verified ) {
+            wp_send_json( array(
+                'result'  => 'error',
+                'message' => 'Invalid nonce',
+            ) );
+        }
 
+        $agreement_id = Utils::safePostValue( 'id' );
 		if ( empty( $agreement_id ) ) {
 			wp_send_json( array(
 				'result'  => 'error',
@@ -574,6 +595,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
 		if ( isset( $agreement['status_code'] ) && $agreement['status_code'] === 200 ) {
 			if ( isset( $agreement['response'] ) && is_string( $agreement['response'] ) ) {
 				$response = json_decode( $agreement['response'], true );
+				
 				if ( isset( $response['agreementStatus'] ) && $response['agreementStatus'] === 'Cancelled' ) {
 					$agreementObj = new Agreement();
 					$agreementObj->delete( $agreement_id );
@@ -642,7 +664,7 @@ if (!class_exists('WC_Payment_Gateway')) return;
 				}
 
 				// Agreement completed — now create the actual payment using the new agreement
-				$paymentCbURL = get_site_url() . BKASH_FW_WC_API . $this->CALLBACK_URL . '?orderId=' . $order_id;
+					$paymentCbURL = get_site_url() . BKASH_DC_WC_API . $this->CALLBACK_URL . '?orderId=' . $order_id;
 				$paymentResult = $process->createPayment(
 					$order_id,
 					$this->intent,

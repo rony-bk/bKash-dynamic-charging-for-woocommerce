@@ -1,7 +1,6 @@
 jQuery(
 	function ($) {
 		window.$ = $.noConflict();
-
 		$( 'form.woocommerce-checkout' ).on(
 			'click',
 			".dcCancelAgreementButton",
@@ -16,31 +15,38 @@ jQuery(
 		);
 
 		function CancelAgreement(agreementID, that) {
-			if (confirm( "Are you sure to cancel this?" )) {
-				blockUI();
-				$.ajax(
-					{
-						type: 'POST',
-						url: bKash_objects.cancelAgreement,
-						contentType: "application/x-www-form-urlencoded; charset=UTF-8",
-						enctype: 'multipart/form-data',
-						data: {'id': agreementID, 'security': $( '#bkash-ajax-nonce' ).val() },
-						success: function (result) {
-							try {
-								result = JSON.parse( result );
-							} catch (e) {
-							}
+		if (confirm( "Are you sure to cancel this?" )) {
+			blockUI();
+			
+			const nonceField = $( '#bkash-dc-ajax-nonce' );
+			const nonceValue = nonceField.val();
+			
+			const ajaxData = {
+				'id': agreementID,
+				'security': nonceValue
+			};
+			
+			$.ajax(
+				{
+					type: 'POST',
+					url: bKash_objects.cancelAgreement,
+					contentType: "application/x-www-form-urlencoded; charset=UTF-8",
+					enctype: 'multipart/form-data',
+					data: ajaxData,
+					success: function (result) {
+						try {
+							result = JSON.parse( result );
+						} catch (e) {}
 
-							if (result.result && result.result === 'success') {
-								submit_error( result.message ? result.message : "Deleted", null, 'info', "Done" );
-								that.closest( 'tr' ).remove();
-							} else {
-								submit_error( result.message ? result.message : "Cannot remove the agreement right now" );
-							}
-							blockUI( true );
-						},
-						error: function (error) {
-							submit_error( "Cannot remove the agreement right now" );
+						if (result.result && result.result === 'success') {
+							submit_error( result.message ? result.message : "Deleted", null, 'info', "Done" );
+							that.closest( 'tr' ).remove();
+						} else {
+							submit_error( result.message ? result.message : "Cannot remove the agreement right now" );
+						}
+						blockUI( true );
+					},
+					error: function (error) {
 							blockUI( true );
 						}
 					}
