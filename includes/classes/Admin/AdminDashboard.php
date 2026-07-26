@@ -65,8 +65,8 @@ class AdminDashboard {
 
 		$sub_menus = array(
 			array(
-				'title'      => 'All Transaction',
-				'menu_title' => 'Transaction',
+				'title'      => 'All Transactions',
+				'menu_title' => 'All Transactions',
 				'route'      => '',
 				'function'   => array( TransactionModule::class, 'transactionList' ),
 				'show'       => true

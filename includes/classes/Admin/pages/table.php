@@ -15,6 +15,24 @@ use bKash\PGW\DC\Sanitizer;
 
 ?>
 	<div class="wrap abs">
+		<style>
+			.bkash-admin-table-scroll {
+				display: block;
+				width: 100%;
+				max-width: 100%;
+				overflow-x: auto;
+				overflow-y: hidden;
+				-webkit-overflow-scrolling: touch;
+				margin-top: 12px;
+			}
+			.bkash-admin-table-scroll table {
+				display: table;
+				min-width: 980px;
+				width: auto;
+				border-collapse: collapse;
+				white-space: nowrap;
+			}
+		</style>
 		<h2>
 			<?php
 			esc_html_e( $title ?? 'List', 'bkash-woocommerce-dynamic-charging' );
@@ -50,7 +68,8 @@ use bKash\PGW\DC\Sanitizer;
 		</div>
 
 		<!-- Table -->
-		<table id="transaction-list-table" class='wp-list-table widefat fixed striped posts' aria-describedby="
+		<div class="bkash-admin-table-scroll" style="width: 100%; max-width: 100%; overflow-x: auto;">
+		<table id="transaction-list-table" class='wp-list-table widefat fixed striped posts' style="min-width: 980px; width: auto; white-space: nowrap;" aria-describedby="
 		<?php
 		esc_attr_e( $title );
 		?>
@@ -132,7 +151,37 @@ use bKash\PGW\DC\Sanitizer;
 											</span>
 										<?php
 									} else {
-										esc_html_e( $row->{$column}, 'bkash-woocommerce-dynamic-charging' );
+										if ( $column === 'user_id' ) {
+											$user_id = (int) ( $row->{$column} ?? 0 );
+											$value   = '';
+
+											if ( $user_id > 0 ) {
+												$user = get_userdata( $user_id );
+												if ( $user ) {
+													$customer_name = trim( (string) get_user_meta( $user_id, 'billing_first_name', true ) . ' ' . (string) get_user_meta( $user_id, 'billing_last_name', true ) );
+													if ( empty( $customer_name ) ) {
+														$customer_name = trim( (string) get_user_meta( $user_id, 'shipping_first_name', true ) . ' ' . (string) get_user_meta( $user_id, 'shipping_last_name', true ) );
+													}
+													if ( empty( $customer_name ) ) {
+														$customer_name = trim( (string) get_user_meta( $user_id, 'first_name', true ) . ' ' . (string) get_user_meta( $user_id, 'last_name', true ) );
+													}
+
+													if ( ! empty( $customer_name ) ) {
+														$value = $customer_name;
+													} else {
+														$value = $user->display_name ?: $user->user_login ?: $user_id;
+													}
+												} else {
+													$value = $row->{$column};
+												}
+											} else {
+												$value = $row->{$column};
+											}
+
+											esc_html_e( $value, 'bkash-woocommerce-dynamic-charging' );
+										} else {
+											esc_html_e( $row->{$column}, 'bkash-woocommerce-dynamic-charging' );
+										}
 									}
 									?>
 								</td>
@@ -182,6 +231,7 @@ use bKash\PGW\DC\Sanitizer;
 			}
 			?>
 		</table>
+		</div>
 	</div>
 
 <?php

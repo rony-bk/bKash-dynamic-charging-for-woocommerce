@@ -15,13 +15,14 @@ class TransactionModule {
 	 */
 	public static function transactionList() {
 		AdminUtility::loadTable(
-			'All bKash Transaction',
+			'All bKash Transactions',
 			'bkash_dc_transactions',
 			array(
 				'ORDER ID'         => 'order_id_wcdc',
 				'INVOICE ID'       => 'invoice_id',
 				'PAYMENT ID'       => 'payment_id',
 				'TRANSACTION ID'   => 'trx_id',
+				'Agreement ID'     => 'agreement_id',
 				'AMOUNT'           => 'amount',
 				'Service Fee'      => 'serviceFee',
 				'INTEGRATION TYPE' => 'integration_type',

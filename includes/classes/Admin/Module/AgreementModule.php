@@ -30,7 +30,7 @@ class AgreementModule {
 			array(
 				'ID'              => 'ID',
 				'PHONE'           => 'phone',
-				'USERID'          => 'user_id',
+				'USER NAME'       => 'user_id',
 				'AGREEMENT TOKEN' => 'agreement_token',
 				'DATETIME'        => 'datetime',
 			),

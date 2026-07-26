@@ -31,6 +31,7 @@ class TablesGenerator {
                     `trx_id` VARCHAR(50) NULL ,
                     `invoice_id` VARCHAR(100) NOT NULL UNIQUE,
                     `payment_id` VARCHAR(50) NULL ,
+                    `agreement_id` VARCHAR(100) NULL,
                     `integration_type` VARCHAR(50) NOT NULL,
                     `mode` VARCHAR(10) NULL,
                     `intent` VARCHAR(20) NULL,
@@ -47,6 +48,11 @@ class TablesGenerator {
 			require_once ABSPATH . BKASH_UPGRADE_FILE;
 			dbDelta( $sql );
 			add_option( 'bkash_dc_transaction_table_version', $my_products_db_version );
+		} else {
+			$column_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM ' . $table_name . ' LIKE %s', 'agreement_id' ) );
+			if ( ! $column_exists ) {
+				$wpdb->query( "ALTER TABLE `$table_name` ADD COLUMN `agreement_id` VARCHAR(100) NULL" );
+			}
 		}
 	}
 

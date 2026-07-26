@@ -37,6 +37,7 @@ class Transaction {
 	private $merchantNumber;
 	private $serviceFee;
 	private $intent;
+	private $agreementID;
 	private $tableName;
 	private $wpdb;
 
@@ -398,6 +399,16 @@ class Transaction {
 		return $this;
 	}
 
+	final public function getAgreementID() {
+		return $this->agreementID;
+	}
+
+	final public function setAgreementID( string $agreementID ): Transaction {
+		$this->agreementID = $agreementID;
+
+		return $this;
+	}
+
 	/**
 	 * Save this transaction in DB table
 	 *
@@ -425,6 +436,7 @@ class Transaction {
 			'currency'         => Sanitizer::safeString( $this->currency ?? 'BDT' ),
 			'refund_id'        => Sanitizer::safeString( $this->refundID ?? '' ),
 			'status'           => Sanitizer::safeString( $this->status ?? 'CREATED' ),
+			'agreement_id'     => Sanitizer::safeString( $this->agreementID ?? '' ),
 			'datetime'         => date( 'Y-m-d H:i:s' ),
 		] );
 
@@ -504,6 +516,7 @@ class Transaction {
 		$this->refundID        = $transaction->refund_id ?? null;
 		$this->refundAmount    = $transaction->refund_amount ?? null;
 		$this->status          = $transaction->status ?? null;
+		$this->agreementID     = $transaction->agreement_id ?? null;
 		$this->dateTime        = $transaction->datetime ?? null;
 
 		return $this;

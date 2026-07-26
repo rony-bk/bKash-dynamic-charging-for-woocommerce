@@ -165,6 +165,9 @@ class Payments {
 			$trx->setCurrency( $currency );
 			$trx->setMode( $mode ?? '' );
 			$trx->setStatus( 'Initiated' );
+			if ( ! empty( $storedAgreementID ) ) {
+				$trx->setAgreementID( $storedAgreementID );
+			}
 
 			if ( ! empty( $payment_payload['merchantInvoiceNumber'] ) ) {
 				$trx->setInvoiceID( $payment_payload['merchantInvoiceNumber'] );
@@ -173,6 +176,10 @@ class Payments {
 			$trxSaved = $trx->save();
 		} else {
 			$trxSaved = $transaction;
+			if ( ! empty( $storedAgreementID ) ) {
+				$trxSaved->setAgreementID( $storedAgreementID );
+				$trxSaved->update( array( 'agreement_id' => $storedAgreementID ) );
+			}
 		}
 
 		if ( $trxSaved ) {
@@ -347,7 +354,8 @@ class Payments {
 								array(
 									'status' => $status,
 									'trx_id' => $paymentResp['trxID'] ?? '',
-									'serviceFee' => $paymentResp['serviceFee'] ?? ''
+									'serviceFee' => $paymentResp['serviceFee'] ?? '',
+									'agreement_id' => $agreement_id ?: $order->get_meta( '_bkash_agreement_id', true ) ?: '',
 								)
 							);
 

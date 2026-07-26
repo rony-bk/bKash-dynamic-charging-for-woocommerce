@@ -108,7 +108,8 @@ if (!class_exists('WC_Payment_Gateway')) return;
 
         $this->id                   = BKASH_DC_PLUGIN_SLUG; 
         $this->icon                 = apply_filters('woocommerce_payment_gateway_bkash_icon',plugins_url( '../assets/images/logo.png', __DIR__ )); 
-        $this->has_fields           = true; 
+        $this->has_fields           = true;
+        $this->order_button_text    = 'Pay with bKash';
         $this->method_title         = 'bKash Dynamic Charging';
         $this->method_description   = 'bKash Payment Gateway provides range of payment solutions to merchants of the online sphere'; 
         $this->siteUrl              = get_site_url();
@@ -657,14 +658,14 @@ if (!class_exists('WC_Payment_Gateway')) return;
 			);
 
 			if ( $agreementResult['success'] ) {
-				$transaction->update( array( 'status' => 'AgreementCompleted', 'mode' => '1001' ) );
+				$transaction->update( array( 'status' => 'AgreementCompleted', 'mode' => '1001', 'agreement_id' => $agreement_id ) );
 				$order->update_meta_data( '_bkmode', '1001' );
 				if ( method_exists( $order, 'save' ) ) {
 					$order->save();
 				}
 
 				// Agreement completed — now create the actual payment using the new agreement
-					$paymentCbURL = get_site_url() . BKASH_DC_WC_API . $this->CALLBACK_URL . '?orderId=' . $order_id;
+				$paymentCbURL = get_site_url() . BKASH_DC_WC_API . $this->CALLBACK_URL . '?orderId=' . $order_id;
 				$paymentResult = $process->createPayment(
 					$order_id,
 					$this->intent,

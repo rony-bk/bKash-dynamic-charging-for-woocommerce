@@ -42,7 +42,7 @@ if ( isset( $agreement ) && is_string( $agreement ) ) {
 	$statusClass    = $status === 'Completed' ? 'bKash-success' : 'bKash-error';
 	?>
 	<div class="gateway-banner bKash-hero-div <?php echo esc_attr( $statusClass ); ?>">
-		<img style="max-width: 90px; margin: 10px 5px" alt="bKash logo agreement search" src="<?php echo esc_url( WooCommerceBkashDC()->pluginUrl() . '/assets/images/logo.png' ); ?>"/>
+		<img style="max-width: 90px; margin: 10px 5px" alt="bKash logo agreement search" src="<?php echo esc_url( \bKash\PGW\DC\WooCommerceBkashDC::getInstance()->pluginUrl() . '/assets/images/logo.png' ); ?>"/>
 		<p class="main">
 			<strong>Agreement ID: <?php esc_html_e( $agreementIdVal, 'bkash-woocommerce-dynamic-charging' ); ?></strong>
 		</p>

@@ -40,7 +40,7 @@ if ( isset( $trx ) && is_string( $trx ) ) {
 	// GOT TRANSACTION
 	?>
 	<div class="gateway-banner bKash-hero-div bKash-success">
-		<img style="max-width: 90px; margin: 10px 5px" alt="bKash logo transaction search" src="<?php echo esc_url( WooCommerceBkashDC()->pluginUrl() . '/assets/images/logo.png' ); ?>"/>
+		<img style="max-width: 90px; margin: 10px 5px" alt="bKash logo transaction search" src="<?php echo esc_url( \bKash\PGW\DC\WooCommerceBkashDC::getInstance()->pluginUrl() . '/assets/images/logo.png' ); ?>"/>
 		<p class="main">
 			<strong>Transaction ID: 
 			<?php
