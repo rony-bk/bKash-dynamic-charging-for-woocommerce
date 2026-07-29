@@ -81,10 +81,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
     /**
      * @var string|null
      */
-    private $api_version;
-    /**
-     * @var string|null
-     */
     private $intent;
     /**
      * @var string|null
@@ -127,7 +123,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
         $this->description      = $this->get_option( 'description' );
         $this->integration_type = $this->get_option( 'integration_type' );
         $this->intent           = $this->get_option( 'intent' );
-        $this->api_version      = $this->get_option( 'bkash_api_version' );
         $this->sandbox          = $this->get_option( 'sandbox' );
         $this->app_key          = $this->get_option( 'app_key' );
         $this->app_secret       = $this->get_option( 'app_secret' );
@@ -216,13 +211,6 @@ if (!class_exists('WC_Payment_Gateway')) return;
                     'authorization' => 'Authorized',
                 ),
                 'default'     => 'checkout',
-                'desc_tip'    => true,
-            ),
-            'bkash_api_version'  => array(
-                'title'       => 'API Version',
-                'type'        => 'text',
-                'description' => 'This api version will be used for calling API to bKash',
-                'default'     => 'v1',
                 'desc_tip'    => true,
             ),
             'debug'              => array(

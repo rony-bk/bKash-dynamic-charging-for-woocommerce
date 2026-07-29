@@ -30,7 +30,9 @@ class AdminUtility {
 		string $tbl_name,
 		array $columns = array(),
 		array $filters = array(),
-		array $actions = array()
+		array $actions = array(),
+		string $extraWhere = '',
+    	array $extraValues = array()
 	) {
 		global $wpdb;
 		$primaryColumn = 'ID';
@@ -41,6 +43,11 @@ class AdminUtility {
 
 		$queryValue[] = 0; // primary columnn value for %d
 		$whereQuery   = "$primaryColumn > %d ";
+
+		if ( ! empty( $extraWhere ) ) {
+			$whereQuery .= " AND ( $extraWhere ) ";
+			$queryValue = array_merge( $queryValue, $extraValues );
+		}
 
 		$filterColumns    = [];
 		$countColumnValue = [];
@@ -193,6 +200,8 @@ class AdminUtility {
 		} elseif ( stripos( $status, "complete" ) !== false ) {
 			$color = "#1dae5b";
 		} elseif ( stripos( $status, "fail" ) !== false ) {
+			$color = "#ff4136";
+		} elseif ( stripos( $status, "void" ) !== false ) {
 			$color = "#ff4136";
 		} elseif ( stripos( $status, "auth" ) !== false ) {
 			$color = "#0b608a";

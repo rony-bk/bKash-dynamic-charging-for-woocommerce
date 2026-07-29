@@ -23,7 +23,6 @@ class BkashApi {
 	private $integration_product = 'paymentonly';
 	private $intent;
 	private $sandbox;
-	private $api_version;
 	private $app_key;
 	private $app_secret;
 	private $username;
@@ -49,7 +48,6 @@ class BkashApi {
 		$this->enabled 	  = $this->getOptions( 'enabled' );
 		$this->integration_product = $this->getOptions( 'integration_type', 'paymentonly' );
 		$this->intent              = $this->getOptions( 'intent', 'sale' );
-		$this->api_version         = $this->getOptions( 'bkash_api_version', 'v1' );
 		$this->sandbox    = $this->getOptions( 'sandbox', false );
 		$this->app_key    = $this->getOptions( 'app_key' );
 		$this->app_secret = $this->getOptions( 'app_secret' );
@@ -76,7 +74,7 @@ class BkashApi {
 				$api_Base_url = "https://dynamic.pay.bka.sh/";
 			}
 			
-			$this->constructed_url = $api_Base_url. $this->api_version . "/";
+			$this->constructed_url = $api_Base_url . 'v1/';
 		}
 		else {
 			Log::error( 'bKash Payment Plugin Not Activate!' );

@@ -573,4 +573,32 @@ class Transaction {
 
 		return null;
 	}
+
+	/**
+	 * @param string|int $payment_id
+	 *
+	 * @return Transaction|null
+	 */
+	final public function getTransactionByPaymentId( $payment_id ) {
+		$tableName  = Sanitizer::safeSqlString( $this->tableName );
+		$whereValue = Sanitizer::safeSqlString( $payment_id );
+
+		$sql = "
+			SELECT *
+			FROM {$tableName}
+			WHERE payment_id = %s
+			ORDER BY ID DESC
+			LIMIT 1
+		";
+
+		$row = $this->wpdb->get_row(
+			$this->wpdb->prepare( $sql, $whereValue )
+		);
+
+		if ( $row ) {
+			return $this->buildTransaction( $row );
+		}
+
+		return null;
+	}
 }

@@ -79,6 +79,13 @@ class AdminDashboard {
 				'show'       => true
 			),
 			array(
+				'title'      => 'Query Payment Status',
+				'menu_title' => 'Query Payment',
+				'route'      => '/query_payment',
+				'function'   => array( TransactionModule::class, 'queryPaymentStatus' ),
+				'show'       => true
+			),
+			array(
 				'title'      => 'Webhook Notifications',
 				'menu_title' => 'Webhook',
 				'route'      => '/webhooks',

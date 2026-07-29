@@ -33,10 +33,14 @@ class TransactionModule {
 				'DATETIME'         => 'datetime',
 			),
 			array(
+				'order_id_wcdc' => 'Order ID',
 				'trx_id'     => 'Transaction ID',
 				'invoice_id' => 'Invoice ID',
 				'status'     => 'Status',
-			)
+			),
+			array(),
+			'status != %s',
+			array( 'AgreementCompleted' )
 		);
 	}
 
@@ -77,5 +81,48 @@ class TransactionModule {
 		}
 
 		include_once BKASH_DC_BASE_PATH . '/includes/classes/Admin/pages/transaction_search.php';
+	}
+
+	/**
+	 * @return void
+	 */
+	public static function queryPaymentStatus() {
+		try {
+			$payment_id = '';
+			if ( Sanitizer::safeServerValue( 'REQUEST_METHOD' ) === 'POST' ) {
+				check_admin_referer( 'bkash_query_payment', 'bkash_query_payment_nonce' );
+				$payment_id = Sanitizer::safePostValue( 'payment_id' );
+			}
+
+			if ( ! empty( $payment_id ) ) {
+				$transaction = new Transaction();
+				$trx = $transaction->getTransactionByPaymentId( $payment_id );
+				$agreement_id = $trx->getAgreementID() ?? '';
+
+				$api  = new BkashApi();
+				$call = $api->queryPayment( $payment_id, $agreement_id );
+
+				if ( isset( $call['status_code'] ) && $call['status_code'] === 200 ) {
+					$trx = array();
+					if ( isset( $call['response'] ) && is_string( $call['response'] ) ) {
+						$trx = json_decode( $call['response'], true );
+					}
+
+					// If any error
+					if ( isset( $trx['statusMessage'] ) && $trx['statusMessage'] !== 'Successful' ) {
+						$trx = $trx['statusMessage'];
+					}
+					if ( isset( $trx['errorMessageEn'] ) && ! empty( $trx['errorMessageEn'] ) ) {
+						$trx = $trx['errorMessageEn'];
+					}
+				} else {
+					$trx = 'Payment information not found, try again';
+				}
+			}
+		} catch ( Exception $ex ) {
+			$trx = $ex->getMessage();
+		}
+		
+		include_once BKASH_DC_BASE_PATH . '/includes/classes/Admin/pages/query_payment.php';
 	}
 }

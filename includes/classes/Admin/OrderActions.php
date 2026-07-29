@@ -320,6 +320,10 @@ class OrderActions {
                 'bKash payment captured successfully.'
             );
 
+            $transaction->update([
+                'status' => 'Completed'
+            ]);
+
             wp_send_json_success(array(
                 'message' => 'bKash payment captured successfully.',
             ));
@@ -398,6 +402,10 @@ class OrderActions {
                 'cancelled',
                 'bKash payment voided successfully.'
             );
+
+            $transaction->update([
+                'status' => 'Voided'
+            ]);
 
             wp_send_json_success(array(
                 'message' => 'bKash payment voided successfully.',
