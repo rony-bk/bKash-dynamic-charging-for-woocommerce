@@ -50,7 +50,6 @@ class AdminUtility {
 		}
 
 		$filterColumns    = [];
-		$countColumnValue = [];
 
 		if ( count( $filters ) > 0 ) {
 			foreach ( $filters as $key => $filter ) {
@@ -64,11 +63,13 @@ class AdminUtility {
 			if ( count( $filterColumns ) > 0 ) {
 				$whereQuery .= 'AND ' . implode( ' = %s AND ', $filterColumns ) . ' = %s ';
 			}
-
-			$countColumnValue = $queryValue; // for counting purpose keeping where info only
-			$queryValue[]     = $offset; // value of offset as %s
-			$queryValue[]     = $limit; // value of limit as %s
 		}
+
+		// For counting purpose keep where parameters (without offset/limit)
+		$countColumnValue = $queryValue;
+
+		$queryValue[]     = $offset; // value of offset as %s
+		$queryValue[]     = $limit; // value of limit as %s
 
 		$sqlQuery   = "SELECT * from $table_name where $whereQuery ORDER BY `ID` DESC limit %d, %d";
 		$countQuery = "SELECT count(*) as total from $table_name where $whereQuery";

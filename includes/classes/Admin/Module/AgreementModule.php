@@ -36,7 +36,7 @@ class AgreementModule {
 			),
 			array(
 				'phone'   => 'Phone',
-				'user_id' => 'User ID',
+				'agreement_token' => 'Agreement Token',
 			),
 			array(
 				array(

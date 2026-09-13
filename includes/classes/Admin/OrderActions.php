@@ -13,6 +13,7 @@
 namespace bKash\PGW\DC\Admin;
 
 use bKash\PGW\DC\BkashApi;
+use bKash\PGW\DC\Log;
 use bKash\PGW\DC\Models\Transaction;
 use bKash\PGW\DC\Operations;
 
@@ -26,12 +27,12 @@ class OrderActions {
 
         add_action( 'wp_ajax_bkash_capture', array( $this, 'ajax_capture' ) );
         add_action( 'wp_ajax_bkash_void', array( $this, 'ajax_void' ) );
+        add_action( 'wp_ajax_bkash_query', array( $this, 'ajax_query' ) );
 
-        add_action( 'admin_footer', array( $this, 'test_output' ) );
+        add_action( 'admin_footer', array( $this, 'processOrders' ) );
     }
 
-    public function test_output() {
-
+    public function processOrders() {
         if (
             empty( $_GET['page'] ) ||
             $_GET['page'] !== 'wc-orders' ||
@@ -416,6 +417,215 @@ class OrderActions {
             'message' => 'Void failed.',
             'response' => $response
         ));
+    }
+
+    public function ajax_query() {
+
+        if ( empty( $_POST['payment_id'] ) ) {
+            wp_send_json_error( array(
+                'message' => 'Missing Payment ID'
+            ) );
+        }
+
+        $payment_id = sanitize_text_field( wp_unslash( $_POST['payment_id'] ) );
+
+        $transactionModel = new Transaction();
+        $transaction = $transactionModel->getTransactionByPaymentId( $payment_id );
+        if ( ! $transaction ) {
+            wp_send_json_error( array(
+                'message' => 'No bKash transaction found for this payment ID.'
+            ) );
+        }
+
+        $agreement_id = $transaction->getAgreementID() ?? '';
+
+        $bkashApi = new BkashApi();
+        // call query API
+        $response = $bkashApi->queryPayment(
+            $payment_id,
+            $agreement_id
+        );
+
+        $body = json_decode( $response['response'] ?? '', true );
+        if ( isset( $response['status_code'] ) && $response['status_code'] == 200 && is_array( $body ) ) {
+
+            $transStatus = isset( $body['transactionStatus'] ) ? strtoupper( $body['transactionStatus'] ) : '';
+            $verification = isset( $body['verificationStatus'] ) ? strtoupper( $body['verificationStatus'] ) : '';
+            $intent = isset( $body['intent'] ) ? strtolower( $body['intent'] ) : '';
+
+            $current_status = $transaction->getStatus();
+            $order_id = $transaction->getOrderID();
+
+            // Case 1: Initiated + Verification Incomplete -> Failed
+            if ( $transStatus === 'INITIATED' && $verification !== 'COMPLETE' ) {
+                $transaction->update( [ 'status' => 'Failed' ] );
+
+                wp_send_json_success( [
+                    'message' => 'Transaction marked as Failed (verification incomplete).',
+                    'api_response' => $body,
+                    'updated_status' => 'Failed',
+                ] );
+            }
+
+            // Case 2: Completed + Verification Complete
+            if ( ($transStatus === 'COMPLETED' || $transStatus === 'AUTHORIZED' ) && $verification === 'COMPLETE' ) {
+                if ( in_array( $current_status, [ 'Initiated', 'CALLBACK_REACHED' ], true ) ) {
+                    $transaction_id = $execBody['trxID'] ?? $body['trxID'] ?? '';
+                    $transaction->update( [ 
+                        'trx_id' => $transaction_id,
+                        'serviceFee' => $execBody['serviceFee'] ?? $body['serviceFee'] ?? '', 
+                        ] );
+
+                    if ( $intent === 'authorization' ) {
+                        $transaction->update( [ 'status' => 'Authorized' ] );
+                        if ( ! empty( $order_id ) ) {
+                            $order = wc_get_order( $order_id );
+                            if ( $order ) {
+                                $order->update_status( 'on-hold', 'bKash payment completed via query.' );
+                            }
+                        }
+
+                        wp_send_json_success( [
+                            'message' => 'Transaction updated to Authorized.',
+                            'api_response' => $body,
+                            'updated_status' => 'Authorized',
+                        ] );
+                    } else {
+                        $transaction->update( [ 'status' => 'Completed' ] );
+                        if ( ! empty( $order_id ) ) {
+                            $order = wc_get_order( $order_id );
+                            if ( $order ) {
+                                $order->update_status( 'processing', 'bKash payment completed via query.' );
+                            }
+                        }
+
+                        wp_send_json_success( [
+                            'message' => 'Transaction updated to Completed.',
+                            'api_response' => $body,
+                            'updated_status' => 'Completed',
+                        ] );
+                    }
+                } else {
+                    wp_send_json_success( [
+                        'message' => 'Transaction already completed.',
+                        'api_response' => $body,
+                        'updated_status' => $current_status,
+                    ] );
+                }
+            }
+
+            // Case 3: Initiated + Verification Complete -> attempt execute
+            if ( $transStatus === 'INITIATED' && $verification === 'COMPLETE' ) {
+                if ( in_array( $current_status, [ 'Initiated', 'CALLBACK_REACHED' ], true ) ) {
+                    // call execute API
+                    $execResp = $bkashApi->executePayment( $payment_id, $agreement_id );
+                    $execBody = json_decode( $execResp['response'] ?? '', true );
+
+                    if ( isset( $execResp['status_code'] ) && $execResp['status_code'] == 200 && is_array( $execBody ) && isset( $execBody['transactionStatus'] ) ) {
+                        $exec_status = $execBody['transactionStatus'] ?? 'NO_STATUS_EXECUTE';
+                        $transaction_id = $execBody['trxID'] ?? $body['trxID'] ?? '';
+                        $updated = $transaction->update(
+                            array(
+                                'status' => $exec_status === 'Authorized' ? 'Authorized' : ( $exec_status === 'Completed' ? 'Completed' : 'Failed' ),
+                                'trx_id' => $transaction_id,
+                                'serviceFee' => $execBody['serviceFee'] ?? $body['serviceFee'] ?? '',
+                            )
+                        );
+
+                        if ( $updated && ! empty( $transaction_id ) ) {
+                            if ( $exec_status === 'Authorized' ) {
+                                $order = wc_get_order( $order_id );
+                                if ( $order ) {
+                                    $order->update_status( 'on-hold' );
+                                    $order->set_transaction_id( $transaction_id );
+                                    $order->save();
+                                }
+                            } elseif ( $exec_status === 'Completed' ) {
+                                $order = wc_get_order( $order_id );
+                                if ( $order ) {
+                                    $order->payment_complete();
+                                    $order->set_transaction_id( $transaction_id );
+                                    $order->save();
+                                }
+                            } else {
+                                $order = wc_get_order( $order_id );
+                                if ( $order ) {
+                                    $order->update_status( 'pending' );
+                                }
+                            }
+
+                            if ( ! empty( $order_id ) ) {
+                                $order = wc_get_order( $order_id );
+                                if ( $order ) {
+                                    $order->add_order_note(
+                                        sprintf( 'bKash PGW payment approved (ID: %s)', $transaction_id )
+                                    );
+                                    wc_reduce_stock_levels( $order_id );
+                                }
+                            }
+
+                            Log::debug( 'bKash PGW payment approved via query (ID: ' . $transaction_id . ')' );
+
+                            wp_send_json_success( [
+                                'message' => 'Execute succeeded; transaction updated and order finalized.',
+                                'api_response' => $execBody,
+                                'updated_status' => $exec_status === 'Authorized' ? 'Authorized' : ( $exec_status === 'Completed' ? 'Completed' : 'Failed' ),
+                            ] );
+                        }
+
+                        if ( $updated && isset( $execBody['paymentId'] ) && ! empty( $execBody['paymentId'] ) ) {
+                            wp_send_json_error( [
+                                'message' => 'Transaction was not successful, last transaction status: ' . $exec_status,
+                                'query_response' => $body,
+                                'execute_response' => $execBody,
+                            ] );
+                        }
+
+                        wp_send_json_error( [
+                            'message' => 'Execute failed or did not complete.',
+                            'query_response' => $body,
+                            'execute_response' => $execBody,
+                        ] );
+                    }
+
+                    // execute failed or did not complete
+                    $transaction->update( [ 'status' => 'Failed' ] );
+                    wp_send_json_error( [
+                        'message' => 'Execute failed or did not complete.',
+                        'query_response' => $body,
+                        'execute_response' => $execBody ?? $execResp,
+                    ] );
+                }
+            }
+
+            // Default: if none of the above matched, update some fields and return
+            $update_data = [ 'status' => $transaction->getStatus() ];
+            if ( isset( $body['trxID'] ) && ! empty( $body['trxID'] ) ) {
+                $update_data['trx_id'] = sanitize_text_field( $body['trxID'] );
+            }
+            if ( isset( $body['mode'] ) && ! empty( $body['mode'] ) ) {
+                $update_data['mode'] = sanitize_text_field( (string) $body['mode'] );
+            }
+            if ( isset( $body['serviceFee'] ) ) {
+                $update_data['serviceFee'] = sanitize_text_field( (string) $body['serviceFee'] );
+            }
+            if ( isset( $body['paymentUpdateTime'] ) && ! empty( $body['paymentUpdateTime'] ) ) {
+                $update_data['datetime'] = sanitize_text_field( $body['paymentUpdateTime'] );
+            }
+
+            $transaction->update( $update_data );
+
+            wp_send_json_success([
+                'message' => 'Query processed.',
+                'api_response' => $body,
+                'updated_status' => $transaction->getStatus(),
+            ]);
+        }
+
+        wp_send_json_error( array(
+            'message' => 'Query failed.',
+            'response' => $response
+        ) );
     }
 }
 

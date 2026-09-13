@@ -25,22 +25,57 @@ class TransactionModule {
 				'Agreement ID'     => 'agreement_id',
 				'AMOUNT'           => 'amount',
 				'Service Fee'      => 'serviceFee',
+				'STATUS'           => 'status',
 				'INTEGRATION TYPE' => 'integration_type',
 				'INTENT'           => 'intent',
 				'MODE'             => 'mode',
-				'REFUND'           => array( 'refund_id', 'refund_amount' ),
-				'STATUS'           => 'status',
+				// 'REFUND'           => array( 'refund_id', 'refund_amount' ),
 				'DATETIME'         => 'datetime',
+				'Action'		   => function( $row ) {
+					$transactionTime = strtotime( $row->datetime );
+					if ( 
+						( isset($row->payment_id) && !empty($row->payment_id) ) &&
+						($row->status === 'Initiated' || $row->status === 'CALLBACK_REACHED') &&
+						$transactionTime >= strtotime( '-7 days' ) 
+					) {
+						return sprintf(
+							'<a href="#" class="button button-primary button-small bkash-query-btn" data-payment-id="%s">Query</a>',
+							esc_attr( $row->payment_id )
+						);
+					}
+
+					if ( $row->status === 'Authorized' && $transactionTime >= strtotime( '-7 days' ) 
+					) {
+						return sprintf(
+							'<a href="#" class="button button-primary button-small bkash-capture-btn" data-order-id="%d" style="background: #dba617; border-color: #c9970d; color: #fff;">Capture</a>
+							<a href="#" class="button button-secondary button-small bkash-void-btn" data-order-id="%1$d" style="margin-left:2px; background: #d63638; border-color: #b32d2e; color: #fff;">Void</a>',
+							$row->order_id_wcdc
+						);
+					}
+					return '';
+				}
 			),
 			array(
 				'order_id_wcdc' => 'Order ID',
 				'trx_id'     => 'Transaction ID',
 				'invoice_id' => 'Invoice ID',
-				'status'     => 'Status',
+				'status' => array(
+					'type' => 'select',
+					'label' => 'Status',
+					'options' => array(
+						'Initiated',
+						'CALLBACK_REACHED',
+						'Authorized',
+						'Completed',
+						'Voided',
+						'Cancelled',
+						'Failed',
+					),
+				),
 			),
 			array(),
-			'status != %s',
-			array( 'AgreementCompleted' )
+			'status != %s AND mode != %d',
+			array( 'AgreementCompleted', 1000 )
 		);
 	}
 

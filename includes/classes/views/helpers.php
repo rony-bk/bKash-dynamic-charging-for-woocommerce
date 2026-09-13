@@ -69,7 +69,7 @@ if ( ! function_exists( 'bkDcShowAgreementTable' ) ) {
 					<td colspan="2">
 						<label for="new-agreement">
 							<input id="new-agreement" type="radio" name="dc_agreement_id" value="new"/>
-							Pay and remember a new bKash account
+							Pay & Save Agreement for future payments
 						</label>
 					</td>
 				</tr>
@@ -82,7 +82,7 @@ if ( ! function_exists( 'bkDcShowAgreementTable' ) ) {
 					<td colspan="2">
 						<label for="non-agreement">
 							<input id="non-agreement" type="radio" name="dc_agreement_id" value="no"/>
-							Pay without remembering
+							Pay without remembering (Payment Only)
 						</label>
 					</td>
 				</tr>
