@@ -21,7 +21,7 @@ Tokenized Checkout: bKash's tokenized checkout provides the customers a more con
 bKash PGW plugin is available for Merchants in Bangladesh, to accepts payments from customer you need to be a bKash merchant first.
 
 
-### Technical Requirements for running this plugin, which is provided solely as a community example for learning and reference purposes:
+### Technical Requirements for running this community example plugin:
 * WordPress 6.0 or above.
 * WooCommerce 8.0 or above.
 * Tested PHP version 8.0
