@@ -10,6 +10,10 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 bKash for WooCommerce plugin is a WordPress based WooCommerce plugin. bKash merchants can install it as a plugin at their online WordPress store.
 
+Disclaimer
+This plugin codebase is provided for community learning and demonstration purposes only. It is not guaranteed to meet production-level security, reliability, or performance standards.
+Before using it in a production environment, thoroughly review, test, and validate its functionality and security. You are free to modify, extend, and reuse the code to suit your needs. Any production use is at your own risk and responsibility.
+
 == Description ==
 
 bKash Payment Gateway provides range of payment solutions to merchants of the online sphere. This is the official bKash PGW plugin, by installing this plugin you’ll be able to integrate the bKash PGW, into your WooCommerce Webshop. The bKash PGW plugin extends WooCommerce allowing you to take payments directly on your store via bKash’s API. This will only take a few minutes. If the plugin is successfully installed your customers will then be able to check out with bKash payment gateway.
