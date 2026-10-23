@@ -38,8 +38,8 @@ bKash PGW plugin is available for Merchants in Bangladesh, to accepts payments f
 
 ### Available Environments
 This plugin supports below environments of bKash payment gateway.
-    * Sandbox
-    * Production
+   * Sandbox
+   * Production
 
 ### Available Payment Methods for bKash Payment Gateway in this plugin
 * Dynamic Charging - Without Agreement(Payment Only)
@@ -72,7 +72,7 @@ This plugin supports below environments of bKash payment gateway.
          - Can refund a transaction.
          - Can disburse money to bKash customer wallet.
          - Can search a transaction from its merchant wallet.
-   * For Tokenization:
+   *  For Tokenization:
          - Can make a payment
          - Can set up bKash payment gateway.
          - Can manage credentials for bKash payment gateway.
@@ -139,8 +139,8 @@ and share it through a Microsoft docs file.
 Share webhook URL to bKash team by collecting from WooCommerce settings for bKash payment gateway.
 
 ### Authorisation (Capture/Void) process:
-To capture a payment collected from customer, merchant has to change order status from ON-HOLD to 'COMPLETED'.
-To void a payment initiate by merchant, merchant has to change order status from ON-HOLD to 'CANCELLED'.
+To capture a payment collected from customer, merchant has to change order status from ON-HOLD to COMPLETED.
+To void a payment initiate by merchant, merchant has to change order status from ON-HOLD to CANCELLED.
 
 If merchant wants to handle Capture/Void scenario programmatically, use standard WooCommerce API/Hooks to change the status.
 
@@ -154,24 +154,28 @@ If merchant wants to handle Capture/Void scenario programmatically, use standard
 
 ### Frequently Asked Questions 
 
-* How can I get a bKash Merchant Account?
-Ans: You can register here – https://www.bkash.com/i-want-register/send-registration-request , Except this interested merchants can call bKash customer care for this. Then CS forwards the request to business team for acquisition.
+- How can I get a bKash Merchant Account?
+  
+   You can register here – https://www.bkash.com/i-want-register/send-registration-request , Except this interested merchants can call bKash customer care for this. Then CS forwards the request to business team for acquisition.
 
 * What bKash Payment methods are available through this plugin?
-Ans: Regular checkout and tokenized checkout and besides Refund, webhooks, search transaction will be available for every merchant.
 
-* What does plugin cost? 
-Ans: This plugin codebase is provided for community learning and demonstration purposes only. It is not guaranteed to meet production-level security, reliability, or performance standards. Before using it in a production environment, thoroughly review, test, and validate its functionality and security. You are free to modify, extend, and reuse the code to suit your needs. Any production use is at your own risk and responsibility. bKash PGW plugin has no setup fees, no monthly fees, no hidden costs: you only get charged when you will make the bank settlement! 
+   Regular checkout and tokenized checkout and besides Refund, webhooks, search transaction will be available for every merchant.
+
+- What does plugin cost?
+  
+   This plugin codebase is provided for community learning and demonstration purposes only. It is not guaranteed to meet production-level security, reliability, or performance standards. Before using it in a production environment, thoroughly review, test, and validate its functionality and security. You are free to modify, extend, and reuse the code to suit your needs. Any production use is at your own risk and responsibility. bKash PGW plugin has no setup fees, no monthly fees, no hidden costs: you only get charged when you will make the bank settlement! 
 
 * Does this plugin need SSL certificate?
-Ans: This plugin codebase is provided for community learning and demonstration purposes only. It is not guaranteed to meet production-level security, reliability, or performance standards. Before using it in a production environment, thoroughly review, test, and validate its functionality and security. You are free to modify, extend, and reuse the code to suit your needs. Any production use is at your own risk and responsibility. Yes! Whenever you go live, an SSL certificate must be installed on your site to use bKash plugin.
 
-* Does this support sandbox mode for testing? 
-Ans: Yes, we have sandbox environment for testing.
+   This plugin codebase is provided for community learning and demonstration purposes only. It is not guaranteed to meet production-level security, reliability, or performance standards. Before using it in a production environment, thoroughly review, test, and validate its functionality and security. You are free to modify, extend, and reuse the code to suit your needs. Any production use is at your own risk and responsibility. Yes! Whenever you go live, an SSL certificate must be installed on your site to use bKash plugin.
+
+* Does this support sandbox mode for testing?
+  
+   Yes, we have sandbox environment for testing.
 
 
 ### Upgrade Notice
-1.0.1
 * Updated & tested compatibility for WordPress 6.9 and WooCommerce 8.0.
 * Added webhook request validation and secure JSON responses.
 * Merchants should verify webhook settings and test upgrades on staging before production.
