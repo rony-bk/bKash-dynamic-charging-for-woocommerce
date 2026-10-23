@@ -1,20 +1,18 @@
-=== bKash For WooCommerce ===
+### bKash For WooCommerce
 Contributors: bkashpayment
-Tags: bKash,bKashPayment,bKashForWooCommerce,online payment,ecommerce,woocommerce
-Requires at least: 6.0
-Tested up to: 6.9
-Stable tag: 1.0.1
-Requires PHP: 8.0
+Tags: bKash,bKashPayment,bKashForWooCommerce, online payment,ecommerce,woocommerce
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-bKash for WooCommerce plugin is a WordPress based WooCommerce plugin. bKash merchants can install it as a plugin at their online WordPress store.
+This plugin codebase is provided solely as a community example for learning and reference purposes. Before using it in a professional or production environment, please thoroughly review and validate all relevant use cases, security considerations, and potential risks. Please note that this codebase is not guaranteed to meet production-level reliability, security, or performance standards. If you choose to reuse or deploy this codebase in a production environment, you are responsible for conducting the necessary reviews, testing, framework version upgrades, and modifications to ensure it meets your specific requirements. 
 
-Disclaimer
+You are free to modify, extend, and adapt the codebase to suit your use case. However, any production use is undertaken at your own discretion and responsibility.
+
+### Disclaimer
 This plugin codebase is provided for community learning and demonstration purposes only. It is not guaranteed to meet production-level security, reliability, or performance standards.
 Before using it in a production environment, thoroughly review, test, and validate its functionality and security. You are free to modify, extend, and reuse the code to suit your needs. Any production use is at your own risk and responsibility.
 
-== Description ==
+### Description
 
 bKash Payment Gateway provides range of payment solutions to merchants of the online sphere. This is the official bKash PGW plugin, by installing this plugin you’ll be able to integrate the bKash PGW, into your WooCommerce Webshop. The bKash PGW plugin extends WooCommerce allowing you to take payments directly on your store via bKash’s API. This will only take a few minutes. If the plugin is successfully installed your customers will then be able to check out with bKash payment gateway.
 bKash has different payment option available, by installing this plugin merchant will be able to integrate bKash “Regular Checkout and Tokenized Checkout”.
@@ -23,14 +21,15 @@ Tokenized Checkout: bKash's tokenized checkout provides the customers a more con
 bKash PGW plugin is available for Merchants in Bangladesh, to accepts payments from customer you need to be a bKash merchant first.
 
 
-### Technical Requirements:
+### Technical Requirements for running this plugin, which is provided solely as a community example for learning and reference purposes:
 * WordPress 6.0 or above.
 * WooCommerce 8.0 or above.
-* PHP 8.0 or above.
+* Tested PHP version 8.0
 * MySQL 5.7 or above.
 * SSL certificate enabled on production sites.
 * Change in Permalink so that .htaccess can be rewritable. (https://wpengine.com/resources/wordpress-permalinks/)
 * File write permission for wp-content directory.
+
 
 ### Non-Technical Requirements:
 * Active bKash Dynamic Charging Merchant Wallet.
@@ -83,29 +82,27 @@ This plugin supports below environments of bKash payment gateway.
          - Can search a transaction from its merchant wallet.
          - Can view and delete all agreements from customers.
 
-== Installation ==
+### Installation 
 
 This section describes how to install the plugin and get it working.
 
 * Manual Installation
-    1. Upload `bkash-for-wooCommerce-main` folder to the `/wp-content/plugins/` directory
-    1. Activate the plugin through the 'Plugins' menu in WordPress
-    1. Go to WooCommerce Settings -> Payment -> Select bKash Payment and process for setup.
-    1. Set your desired setup and set bKash provided credentials (App Key, App Secret, Username and Password).
+    - Upload `bkash-for-wooCommerce-main` folder to the `/wp-content/plugins/` directory
+    - Activate the plugin through the 'Plugins' menu in WordPress
+    - Go to WooCommerce Settings -> Payment -> Select bKash Payment and process for setup.
+    - Set your desired setup and set bKash provided credentials (App Key, App Secret, Username and Password).
 
 * Install by Searching
-    1. Go to Plugins
-    1. Click Add new button
-    1. Search for bKash For WooCommerce
-    1. Click install and activate.
+    - Go to Plugins
+    - Click Add new button
+    - Search for bKash For WooCommerce
+    - Click install and activate.
 
 ### Configuration
-1. Log into your WordPress admin and activate the bKash plugin in WordPress Plugin Manager.
-1. Log into your WooCommerce Webstore account, navigate to Settings and click the Payment tab.
-1. Scroll down to the Payment page and go to the manage option of bKash Payment Gateway under Gateway Display.
-1. Click on bKash Payment Gateway to edit the settings. If you do not see bKash Payment Gateway in the list, make sure you have activated the plugin in the WordPress Plugin Manager.
-
-
+* Log into your WordPress admin and activate the bKash plugin in WordPress Plugin Manager.
+* Log into your WooCommerce Webstore account, navigate to Settings and click the Payment tab.
+* Scroll down to the Payment page and go to the manage option of bKash Payment Gateway under Gateway Display.
+* Click on bKash Payment Gateway to edit the settings. If you do not see bKash Payment Gateway in the list, make sure you have activated the plugin in the WordPress Plugin Manager.
 * Fill in the following credentials.
     - Enable - Enable bKash PGW
     - Title – bKash WooCommerce - Dynamic Charging
@@ -122,6 +119,9 @@ This section describes how to install the plugin and get it working.
     - UserName – Sandbox/Production username shared by bKash
     - Password - Sandbox/Production Password shared by bKash
     - Your bKash payment gateway is enabled. Now you can accept payment through bKash.
+
+This plugin codebase is provided for community learning and demonstration purposes only. It is not guaranteed to meet production-level security, reliability, or performance standards. Before using it in a production environment, thoroughly review, test, and validate its functionality and security. 
+You are free to modify, extend, and reuse the code to suit your needs. Any production use is at your own risk and responsibility
 
 ### Sandbox Result:
 For sandbox validation, you may need to share sandbox responses with bKash integration team.
@@ -152,51 +152,26 @@ If merchant wants to handle Capture/Void scenario programmatically, use standard
 * Authorised and Capture action can be performed by changing order status On Hold → Completed.
 * All transactions and history list are made using pagination, so on each page 10 entries can be viewed.
 
-== Frequently Asked Questions ==
+### Frequently Asked Questions 
 
-= How can I get a bKash Merchant Account? =
+* How can I get a bKash Merchant Account?
 Ans: You can register here – https://www.bkash.com/i-want-register/send-registration-request , Except this interested merchants can call bKash customer care for this. Then CS forwards the request to business team for acquisition.
-= What bKash Payment methods are available through this plugin? =
-Ans: Regular checkout and tokenized checkout and besides Refund, webhooks, search transaction will be available for every merchant.
-= What does plugin cost? =
-Ans: bKash PGW plugin has no setup fees, no monthly fees, no hidden costs: you only get charged when you will make the bank settlement!
-= Does this plugin need SSL certificate? =
-Ans: Yes! Whenever you go live, an SSL certificate must be installed on your site to use bKash plugin.
-= Does this support sandbox mode for testing? =
-Ans: Yes, we have sandbox environment for testing.
-= Is there any manual available for this plugin? =
-Ans: Yes, we have a detailed manual for this plugin, you can download it from here
-= How to Download & Install bKash WooCommerce Payment Plugin =
-Ans: Visit this link for the tutorial - https://drive.google.com/file/d/1ED5f1pfvAXrk2dZShUvvIIHEIUcIQ0Sg/view?usp=sharing
-= How to configure bKash Checkout WooCommerce Part-1 =
-Ans: Visit this link for the tutorial - https://drive.google.com/file/d/15MlWEjkqus6k2LHv01nfUyCgsg5VSVWp/view?usp=sharing
-= Process of bKash Checkout API Log File Creation Part 2.1 =
-Ans: Visit this link for the tutorial - https://drive.google.com/file/d/1K0LbRzGWLSZfnieuCWmG5dAbRc-gicCD/view?usp=sharing
-= Process of bKash Checkout-Refund API Log Part-2.2 =
-Ans: Visit this link for the tutorial - https://drive.google.com/file/d/1TIqD24xIG9YvyjME0Y4sdJYYFPVXvDmy/view?usp=sharing
-= Process of bKash Checkout-Search Transaction API Log Part-2.3 =
-Ans: Visit this link for the tutorial - https://drive.google.com/file/d/1kFX45QwvxHwZJ9MAUJPXTYpTRQGBg5RF/view?usp=sharing
-= Process of bKash Checkout-Error Case Implementation Part-2.4 =
-Ans: Visit this link for the tutorial - https://drive.google.com/file/d/11DLX8KrstzHJj3w2UX89lMbTUQzQ5R7x/view?usp=sharing
-= Process of bKash Checkout-Generate Final Log File (Checkout, Search, Error Case & Refund) Part-2.5 =
-Ans: Visit this link for the tutorial - https://drive.google.com/file/d/15hXTl-KG2RwI94JX3yBBUURQq9X5G2g8/view?usp=sharing
 
-== Upgrade Notice ==
-= 1.0.1 =
-* Updated compatibility for WordPress 6.9 and WooCommerce 8.0.
+* What bKash Payment methods are available through this plugin?
+Ans: Regular checkout and tokenized checkout and besides Refund, webhooks, search transaction will be available for every merchant.
+
+* What does plugin cost? 
+Ans: This plugin codebase is provided for community learning and demonstration purposes only. It is not guaranteed to meet production-level security, reliability, or performance standards. Before using it in a production environment, thoroughly review, test, and validate its functionality and security. You are free to modify, extend, and reuse the code to suit your needs. Any production use is at your own risk and responsibility. bKash PGW plugin has no setup fees, no monthly fees, no hidden costs: you only get charged when you will make the bank settlement! 
+
+* Does this plugin need SSL certificate?
+Ans: This plugin codebase is provided for community learning and demonstration purposes only. It is not guaranteed to meet production-level security, reliability, or performance standards. Before using it in a production environment, thoroughly review, test, and validate its functionality and security. You are free to modify, extend, and reuse the code to suit your needs. Any production use is at your own risk and responsibility. Yes! Whenever you go live, an SSL certificate must be installed on your site to use bKash plugin.
+
+* Does this support sandbox mode for testing? 
+Ans: Yes, we have sandbox environment for testing.
+
+
+### Upgrade Notice
+1.0.1
+* Updated & tested compatibility for WordPress 6.9 and WooCommerce 8.0.
 * Added webhook request validation and secure JSON responses.
 * Merchants should verify webhook settings and test upgrades on staging before production.
-
-== Screenshots ==
-1. bKash payment method in Woocommerce payment method list
-2. Settings page of bKash payment method
-3. User paying with bKash Payment method
-4. Transaction list for admin to check
-
-== Changelog ==
-= 1.0.1 =
-* Added WP 6.9 and WooCommerce 8.0 compatibility.
-* Added webhook validation and JSON error handling.
-
-= 1.0.0 =
-* Tested upto wordpress 6.5.4
